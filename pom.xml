@@ -18,6 +18,7 @@
         <module>atcrowdfunding14-member-order-consumer</module>
         <module>atcrowdfunding15-member-pay-consumer</module>
         <module>atcrowdfunding16-member-zuul</module>
+        <module>atcrowdfunding17-member-api</module>
     </modules>
 
     <properties>
