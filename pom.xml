@@ -6,7 +6,18 @@
 
     <groupId>com.atguigu.crowd</groupId>
     <artifactId>atcrowdfunding07-member-parent</artifactId>
+    <packaging>pom</packaging>
     <version>1.0-SNAPSHOT</version>
+    <modules>
+        <module>atcrowdfunding08-member-eureka</module>
+        <module>atcrowdfunding09-member-entity</module>
+        <module>atcrowdfunding10-member-mysql-provider</module>
+        <module>atcrowdfunding11-member-redis-provider</module>
+        <module>atcrowdfunding12-member-authentication-consumer</module>
+        <module>atcrowdfunding13-member-project-consumer</module>
+        <module>atcrowdfunding14-member-order-consumer</module>
+        <module>atcrowdfunding15-member-pay-consumer</module>
+    </modules>
 
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
