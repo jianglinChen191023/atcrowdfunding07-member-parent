@@ -3,7 +3,7 @@ package com.atguigu.crowd.service.api;
 import com.atguigu.crowd.entity.po.MemberPO;
 
 /**
- * @author chenjianglin
+ * @author 陈江林
  * @date 2022/8/19 09:15
  */
 public interface MemberService {

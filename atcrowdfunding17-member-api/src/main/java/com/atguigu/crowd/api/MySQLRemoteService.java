@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
- * @author chenjianglin
+ * @author 陈江林
  * @date 2022/8/19 09:05
  */
 @FeignClient("atguigu-crowd-mysql")

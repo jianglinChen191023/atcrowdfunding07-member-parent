@@ -14,7 +14,7 @@ import java.util.List;
  * ## 1.在类上使用 @Transactional(readOnly = true)
  * - 针对查询操作设置事务属性
  *
- * @author chenjianglin
+ * @author 陈江林
  * @date 2022/8/19 09:16
  */
 @Transactional(readOnly = true)
