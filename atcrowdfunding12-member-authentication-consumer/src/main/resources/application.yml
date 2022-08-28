@@ -1,0 +1,17 @@
+server:
+  port: 4000
+
+spring:
+  application:
+    name: atguigu-crowd-auth
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:1000/eureka
+
+ribbon:
+  # 10秒 - 处理请求的超时时间，默认为5秒
+  ReadTimeout: 10000
+  # 10秒 - 连接建立的超时时长，默认5秒
+  ConnectTimeout: 10000
