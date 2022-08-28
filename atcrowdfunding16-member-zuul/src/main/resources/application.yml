@@ -1,0 +1,27 @@
+server:
+  port: 80
+
+spring:
+  application:
+    name: atguigu-crowd-zuul
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:1000/eureka
+
+zuul:
+  # 忽略原本的微服务名称
+  ignored-services: "*"
+  # 在 zuul 中其他微服务重定向时保持原本的头信息（请求头、响应头）
+  sensitive-headers: "*"
+  routes:
+    crowd-portal:
+      service-id: atguigu-crowd-auth
+      path: /**
+
+ribbon:
+  # 10秒 - 处理请求的超时时间，默认为5秒
+  ReadTimeout: 10000
+  # 10秒 - 连接建立的超时时长，默认5秒
+  ConnectTimeout: 10000
