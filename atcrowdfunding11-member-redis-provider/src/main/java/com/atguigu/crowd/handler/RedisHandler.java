@@ -28,7 +28,7 @@ public class RedisHandler {
      * @return
      */
     @RequestMapping("/set/redis/key/value/remote")
-    ResultEntity<String> setRedisKeyValueRemote(
+    public ResultEntity<String> setRedisKeyValueRemote(
             @RequestParam("key") String key,
             @RequestParam("value") String value) {
         try {
@@ -51,7 +51,7 @@ public class RedisHandler {
      * @return
      */
     @RequestMapping("/set/redis/key/value/remote/with/timeout")
-    ResultEntity<String> setRedisKeyValueRemoteWithTimeout(
+    public ResultEntity<String> setRedisKeyValueRemoteWithTimeout(
             @RequestParam("key") String key,
             @RequestParam("value") String value,
             @RequestParam("time") long time,
@@ -73,7 +73,7 @@ public class RedisHandler {
      * @return
      */
     @RequestMapping("get/redis/key/value/by/key")
-    ResultEntity<String> getRedisKeyValueByKey(@RequestParam("key") String key) {
+    public ResultEntity<String> getRedisKeyValueByKey(@RequestParam("key") String key) {
         try {
             ValueOperations<String, String> operations = redisTemplate.opsForValue();
             String value = operations.get(key);
@@ -91,7 +91,7 @@ public class RedisHandler {
      * @return
      */
     @RequestMapping("remove/redis/key/remote")
-    ResultEntity<String> removeRedisKeyRemote(@RequestParam("key") String key) {
+    public ResultEntity<String> removeRedisKeyRemote(@RequestParam("key") String key) {
         try {
             redisTemplate.delete(key);
 

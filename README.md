@@ -65,6 +65,40 @@
         - [10.3 新建 `application.yml` 配置](#103-新建-applicationyml-配置)
     - [11. 关于第一次请求超时](#11-关于第一次请求超时)
 
+- [十七 会员注册](#十七-会员注册)
+    - [1. 调用第三方短信接口](#1-调用第三方短信接口)
+        - [1.1 追加依赖【`common`工程】](#11-追加依赖common工程)
+        - [1.2 新建 `HttpUtils` 类【`common`工程】](#12-新建-httputils-类common工程)
+        - [1.3 新建 `CrowdTest` 测试类【`auth` 工程】](#13-新建-crowdtest-测试类auth-工程)
+            - [1.3.1 前置: 追加依赖](#131-前置-追加依赖)
+        - [1.4 `CrowdUtil` 追加方法【`common`工程】](#14-crowdutil-追加方法common工程)
+    - [2. 发送验证码【`auth` 工程】](#2-发送验证码auth-工程)
+        - [2.1 配置跳转路径和对应的页面](#21-配置跳转路径和对应的页面)
+            - [2.1.1 新建 `CrowdWebMvcConfig` 类](#211-新建-crowdwebmvcconfig-类)
+        - [2.2 修改代码 `portal.html`](#22-修改代码-portalhtml)
+        - [2.3 新建 `member-reg.html` 注册页面](#23-新建-member-reghtml-注册页面)
+            - [2.3.1 添加 `layer`到 `static` 下 📎layer.zip](#231-添加-layer到-static-下-layerzip)
+        - [2.4 追加依赖](#24-追加依赖)
+        - [2.5 新建 `ShortMessageProperties` 类](#25-新建-shortmessageproperties-类)
+        - [2.6 追加配置](#26-追加配置)
+        - [2.7 新建 `MemberHandler` 发送短信](#27-新建-memberhandler-发送短信)
+        - [2.8 追加代码 `CrowdConstant`【`common`】](#28-追加代码-crowdconstantcommon)
+    - [3. 执行注册流程](#3-执行注册流程)
+        - [3.1 追加代码 `MySQLRemoteService`【`API` 工程】](#31-追加代码-mysqlremoteserviceapi-工程)
+        - [3.2 `MySQL` 项目](#32-mysql-项目)
+            - [3.2.1 追加代码 `MemberProviderHandler`](#321-追加代码-memberproviderhandler)
+            - [3.2.2 追加代码 `MemberService`](#322-追加代码-memberservice)
+            - [3.2.3 追加代码 `MemberServiceImpl`](#323-追加代码-memberserviceimpl)
+        - [3.3 测试 `http://localhost:2000/save/member/remote`](#33-测试-httplocalhost2000savememberremote)
+        - [3.4 `Entity` 工程](#34-entity-工程)
+            - [3.4.1 新建 `MemberVO` 封装表单数据](#341-新建-membervo-封装表单数据)
+        - [3.5 `Auth` 项目](#35-auth-项目)
+            - [3.5.1 追加代码 `MemberHandler`](#351-追加代码-memberhandler)
+            - [3.5.2 登录页面 `member-login.html`](#352-登录页面-member-loginhtml)
+        - [3.6 `Common` 工程](#36-common-工程)
+            - [3.6.1 追加代码 `CrowdContant`](#361-追加代码-crowdcontant)
+
+
 # 十六 会员系统-搭建环境
 
 ## 1. 尚筹网会员系统总目标
@@ -3757,4 +3791,1108 @@ ribbon:
   ReadTimeout: 10000
   # 10秒 - 连接建立的超时时长，默认5秒
   ConnectTimeout: 10000
+```
+
+
+# 十七 会员注册
+
+>  `git checkout -b 17.0.0_member_reg`
+
+## 1. 调用第三方短信接口
+
+- [云市场](https://market.aliyun.com/?spm=5176.product-detail.J_3207526240.2.2ba07b9d1oPiiz)
+
+### 1.1 追加依赖【`common`工程】
+
+```xml
+<!-- 以下是发送短信时调用第三方 API 所需的依赖 -->
+<dependency>
+    <groupId>com.alibaba</groupId>
+    <artifactId>fastjson</artifactId>
+    <version>1.2.15</version>
+</dependency>
+
+<dependency>
+    <groupId>org.apache.httpcomponents</groupId>
+    <artifactId>httpclient</artifactId>
+    <version>4.5.9</version>
+</dependency>
+
+<dependency>
+    <groupId>org.eclipse.jetty</groupId>
+    <artifactId>jetty-util</artifactId>
+    <version>9.4.19.v20190610</version>
+</dependency>
+
+<dependency>
+    <groupId>commons-lang</groupId>
+    <artifactId>commons-lang</artifactId>
+    <version>2.6</version>
+</dependency>
+```
+
+
+
+### 1.2 新建 `HttpUtils` 类【`common`工程】
+
+```java
+package com.aliyun.api.gateway.demo.util;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
+import org.apache.http.conn.ClientConnectionManager;
+import org.apache.http.conn.scheme.Scheme;
+import org.apache.http.conn.scheme.SchemeRegistry;
+import org.apache.http.conn.ssl.SSLSocketFactory;
+import org.apache.http.entity.ByteArrayEntity;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.message.BasicNameValuePair;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * @author 陈江林
+ * @date 2022/8/29 09:27
+ */
+public class HttpUtils {
+
+    /**
+     * get
+     *
+     * @param host
+     * @param path
+     * @param method
+     * @param headers
+     * @param querys
+     * @return
+     * @throws Exception
+     */
+    public static HttpResponse doGet(String host, String path, String method,
+                                     Map<String, String> headers,
+                                     Map<String, String> querys)
+            throws Exception {
+        HttpClient httpClient = wrapClient(host);
+
+        HttpGet request = new HttpGet(buildUrl(host, path, querys));
+        for (Map.Entry<String, String> e : headers.entrySet()) {
+            request.addHeader(e.getKey(), e.getValue());
+        }
+
+        return httpClient.execute(request);
+    }
+
+    /**
+     * post form
+     *
+     * @param host
+     * @param path
+     * @param method
+     * @param headers
+     * @param querys
+     * @param bodys
+     * @return
+     * @throws Exception
+     */
+    public static HttpResponse doPost(String host, String path, String method,
+                                      Map<String, String> headers,
+                                      Map<String, String> querys,
+                                      Map<String, String> bodys)
+            throws Exception {
+        HttpClient httpClient = wrapClient(host);
+
+        HttpPost request = new HttpPost(buildUrl(host, path, querys));
+        for (Map.Entry<String, String> e : headers.entrySet()) {
+            request.addHeader(e.getKey(), e.getValue());
+        }
+
+        if (bodys != null) {
+            List<NameValuePair> nameValuePairList = new ArrayList<NameValuePair>();
+
+            for (String key : bodys.keySet()) {
+                nameValuePairList.add(new BasicNameValuePair(key, bodys.get(key)));
+            }
+            UrlEncodedFormEntity formEntity = new UrlEncodedFormEntity(nameValuePairList, "utf-8");
+            formEntity.setContentType("application/x-www-form-urlencoded; charset=UTF-8");
+            request.setEntity(formEntity);
+        }
+
+        return httpClient.execute(request);
+    }
+
+    /**
+     * Post String
+     *
+     * @param host
+     * @param path
+     * @param method
+     * @param headers
+     * @param querys
+     * @param body
+     * @return
+     * @throws Exception
+     */
+    public static HttpResponse doPost(String host, String path, String method,
+                                      Map<String, String> headers,
+                                      Map<String, String> querys,
+                                      String body)
+            throws Exception {
+        HttpClient httpClient = wrapClient(host);
+
+        HttpPost request = new HttpPost(buildUrl(host, path, querys));
+        for (Map.Entry<String, String> e : headers.entrySet()) {
+            request.addHeader(e.getKey(), e.getValue());
+        }
+
+        if (StringUtils.isNotBlank(body)) {
+            request.setEntity(new StringEntity(body, "utf-8"));
+        }
+
+        return httpClient.execute(request);
+    }
+
+    /**
+     * Post stream
+     *
+     * @param host
+     * @param path
+     * @param method
+     * @param headers
+     * @param querys
+     * @param body
+     * @return
+     * @throws Exception
+     */
+    public static HttpResponse doPost(String host, String path, String method,
+                                      Map<String, String> headers,
+                                      Map<String, String> querys,
+                                      byte[] body)
+            throws Exception {
+        HttpClient httpClient = wrapClient(host);
+
+        HttpPost request = new HttpPost(buildUrl(host, path, querys));
+        for (Map.Entry<String, String> e : headers.entrySet()) {
+            request.addHeader(e.getKey(), e.getValue());
+        }
+
+        if (body != null) {
+            request.setEntity(new ByteArrayEntity(body));
+        }
+
+        return httpClient.execute(request);
+    }
+
+    /**
+     * Put String
+     *
+     * @param host
+     * @param path
+     * @param method
+     * @param headers
+     * @param querys
+     * @param body
+     * @return
+     * @throws Exception
+     */
+    public static HttpResponse doPut(String host, String path, String method,
+                                     Map<String, String> headers,
+                                     Map<String, String> querys,
+                                     String body)
+            throws Exception {
+        HttpClient httpClient = wrapClient(host);
+
+        HttpPut request = new HttpPut(buildUrl(host, path, querys));
+        for (Map.Entry<String, String> e : headers.entrySet()) {
+            request.addHeader(e.getKey(), e.getValue());
+        }
+
+        if (StringUtils.isNotBlank(body)) {
+            request.setEntity(new StringEntity(body, "utf-8"));
+        }
+
+        return httpClient.execute(request);
+    }
+
+    /**
+     * Put stream
+     *
+     * @param host
+     * @param path
+     * @param method
+     * @param headers
+     * @param querys
+     * @param body
+     * @return
+     * @throws Exception
+     */
+    public static HttpResponse doPut(String host, String path, String method,
+                                     Map<String, String> headers,
+                                     Map<String, String> querys,
+                                     byte[] body)
+            throws Exception {
+        HttpClient httpClient = wrapClient(host);
+
+        HttpPut request = new HttpPut(buildUrl(host, path, querys));
+        for (Map.Entry<String, String> e : headers.entrySet()) {
+            request.addHeader(e.getKey(), e.getValue());
+        }
+
+        if (body != null) {
+            request.setEntity(new ByteArrayEntity(body));
+        }
+
+        return httpClient.execute(request);
+    }
+
+    /**
+     * Delete
+     *
+     * @param host
+     * @param path
+     * @param method
+     * @param headers
+     * @param querys
+     * @return
+     * @throws Exception
+     */
+    public static HttpResponse doDelete(String host, String path, String method,
+                                        Map<String, String> headers,
+                                        Map<String, String> querys)
+            throws Exception {
+        HttpClient httpClient = wrapClient(host);
+
+        HttpDelete request = new HttpDelete(buildUrl(host, path, querys));
+        for (Map.Entry<String, String> e : headers.entrySet()) {
+            request.addHeader(e.getKey(), e.getValue());
+        }
+
+        return httpClient.execute(request);
+    }
+
+    private static String buildUrl(String host, String path, Map<String, String> querys) throws UnsupportedEncodingException {
+        StringBuilder sbUrl = new StringBuilder();
+        sbUrl.append(host);
+        if (!StringUtils.isBlank(path)) {
+            sbUrl.append(path);
+        }
+        if (null != querys) {
+            StringBuilder sbQuery = new StringBuilder();
+            for (Map.Entry<String, String> query : querys.entrySet()) {
+                if (0 < sbQuery.length()) {
+                    sbQuery.append("&");
+                }
+                if (StringUtils.isBlank(query.getKey()) && !StringUtils.isBlank(query.getValue())) {
+                    sbQuery.append(query.getValue());
+                }
+                if (!StringUtils.isBlank(query.getKey())) {
+                    sbQuery.append(query.getKey());
+                    if (!StringUtils.isBlank(query.getValue())) {
+                        sbQuery.append("=");
+                        sbQuery.append(URLEncoder.encode(query.getValue(), "utf-8"));
+                    }
+                }
+            }
+            if (0 < sbQuery.length()) {
+                sbUrl.append("?").append(sbQuery);
+            }
+        }
+
+        return sbUrl.toString();
+    }
+
+    private static HttpClient wrapClient(String host) {
+        HttpClient httpClient = new DefaultHttpClient();
+        if (host.startsWith("https://")) {
+            sslClient(httpClient);
+        }
+
+        return httpClient;
+    }
+
+    private static void sslClient(HttpClient httpClient) {
+        try {
+            SSLContext ctx = SSLContext.getInstance("TLS");
+            X509TrustManager tm = new X509TrustManager() {
+                @Override
+                public X509Certificate[] getAcceptedIssuers() {
+                    return null;
+                }
+
+                @Override
+                public void checkClientTrusted(X509Certificate[] xcs, String str) {
+
+                }
+
+                @Override
+                public void checkServerTrusted(X509Certificate[] xcs, String str) {
+
+                }
+            };
+            ctx.init(null, new TrustManager[]{tm}, null);
+            SSLSocketFactory ssf = new SSLSocketFactory(ctx);
+            ssf.setHostnameVerifier(SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
+            ClientConnectionManager ccm = httpClient.getConnectionManager();
+            SchemeRegistry registry = ccm.getSchemeRegistry();
+            registry.register(new Scheme("https", 443, ssf));
+        } catch (KeyManagementException ex) {
+            throw new RuntimeException(ex);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+}
+```
+
+
+
+### 1.3 新建 `CrowdTest` 测试类【`auth` 工程】
+
+#### 1.3.1 前置: 追加依赖
+
+```xml
+<!-- SpringBoot 测试 -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-test</artifactId>
+    <version>2.1.6.RELEASE</version>
+    <scope>test</scope>
+</dependency>
+```
+
+------
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661739650139-ba5aeaa8-0737-4890-9b90-9f38ba8a388d.png)
+
+```java
+package com.atguigu.crowd.test;
+
+import com.aliyun.api.gateway.demo.util.HttpUtils;
+import org.apache.http.HttpResponse;
+import org.apache.http.util.EntityUtils;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.junit4.SpringRunner;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * @author 陈江林
+ * @date 2022/8/29 09:16
+ */
+@RunWith(SpringRunner.class)
+@SpringBootTest
+public class CrowdTest {
+
+    @Test
+    public void testSendMessage() {
+        String host = "https://dfsns.market.alicloudapi.com";
+        String path = "/data/send_sms";
+        String method = "POST";
+        String appcode = "1948fa6afc674ea3bc2fea47f36e1108";
+        Map<String, String> headers = new HashMap<>();
+        //最后在header中的格式(中间是英文空格)为Authorization:APPCODE 83359fd73fe94948385f570e3c139105
+        headers.put("Authorization", "APPCODE " + appcode);
+        //根据API的要求，定义相对应的Content-Type
+        headers.put("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+        Map<String, String> querys = new HashMap<>();
+        Map<String, String> bodys = new HashMap<>();
+        bodys.put("content", "code:1234");
+        bodys.put("phone_number", "185xxxx5080");
+        bodys.put("template_id", "TPL_0000");
+
+        try {
+            /**
+             * 重要提示如下:
+             * HttpUtils请从
+             * https://github.com/aliyun/api-gateway-demo-sign-java/blob/master/src/main/java/com/aliyun/api/gateway/demo/util/HttpUtils.java
+             * 下载
+             *
+             * 相应的依赖请参照
+             * https://github.com/aliyun/api-gateway-demo-sign-java/blob/master/pom.xml
+             */
+            HttpResponse response = HttpUtils.doPost(host, path, method, headers, querys, bodys);
+            // System.out.println(response.toString());
+            // 获取response的body
+            // {"status":"OK","request_id":"TIDef01a498c96747a19aa166cd81f9279d"}
+            System.out.println(EntityUtils.toString(response.getEntity()));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+### 1.4 `CrowdUtil` 追加方法【`common`工程】
+
+```java
+/**
+ * 给远程第三方接口发送请求把验证码发送到用户手机上
+ *
+ * @param appCode     用来调用第三方短信 API 的 AppCode
+ * @param templateId  模板的编号
+ * @param host        短信接口调用的 URL 地址
+ * @param path        具体发送短信功能的地址
+ * @param method      请求方式
+ * @param phoneNumber 接收短信的手机号码
+ * @return 成功返回: 验证码
+ */
+public static ResultEntity<String> sendShortMessage(String appCode, String templateId, String host, String path, String method, String phoneNumber) {
+    // 生成验证码
+    StringBuilder code = new StringBuilder();
+    for (int i = 0; i < 4; i++) {
+        int random = (int) (Math.random() * 10);
+        code.append(random);
+    }
+
+    Map<String, String> headers = new HashMap<>();
+    //最后在header中的格式(中间是英文空格)为Authorization:APPCODE 83359fd73fe94948385f570e3c139105
+    headers.put("Authorization", "APPCODE " + appCode);
+    //根据API的要求，定义相对应的Content-Type
+    headers.put("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+    Map<String, String> querys = new HashMap<>();
+    Map<String, String> bodys = new HashMap<>();
+
+    bodys.put("content", "code:" + code);
+    bodys.put("phone_number", phoneNumber);
+    if (templateId == null) {
+        // 测试模板的 Id
+        bodys.put("template_id", "TPL_0000");
+    } else {
+        bodys.put("template_id", templateId);
+    }
+
+    try {
+        /**
+         * 重要提示如下:
+         * HttpUtils请从
+         * https://github.com/aliyun/api-gateway-demo-sign-java/blob/master/src/main/java/com/aliyun/api/gateway/demo/util/HttpUtils.java
+         * 下载
+         *
+         * 相应的依赖请参照
+         * https://github.com/aliyun/api-gateway-demo-sign-java/blob/master/pom.xml
+         */
+        HttpResponse response = HttpUtils.doPost(host, path, method, headers, querys, bodys);
+        System.out.println(response.toString());
+        //获取response的body
+        //System.out.println(EntityUtils.toString(response.getEntity()));
+
+        StatusLine statusLine = response.getStatusLine();
+        // 状态码: [{200: 正常}, {400: 请求参数错误}, {403: 套餐余额用完}, {500: 服务器内部错误}]
+        int statusCode = statusLine.getStatusCode();
+        String reasonPhrase = statusLine.getReasonPhrase();
+
+        if (statusCode == 200) {
+            return ResultEntity.successWithData(code.toString());
+        } else {
+            return ResultEntity.failed(reasonPhrase);
+        }
+    } catch (Exception e) {
+        return ResultEntity.failed(e.getMessage());
+    }
+}
+```
+
+
+
+## 2. 发送验证码【`auth` 工程】
+
+- 将验证码发送到用户手机上
+- 将验证码存入 `Redis` 中
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661752982629-d2f728d5-2193-4e09-9e26-1238e5862231.png)
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661303711451-a1e90c90-61a4-4c8c-8822-806ebac12970.png)
+
+
+
+### 2.1 配置跳转路径和对应的页面
+
+#### 2.1.1 新建 `CrowdWebMvcConfig` 类
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661741337449-58492ae4-ac1b-41d9-9555-3ce4f4267504.png)
+
+```java
+package com.atguigu.crowd.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+/**
+ * @author 陈江林
+ * @date 2022/8/29 10:48
+ */
+@Configuration
+public class CrowdWebMvcConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        registry.addViewController("/auth/member/to/reg/page").setViewName("member-reg");
+        registry.addViewController("/auth/member/to/login/page").setViewName("member-login");
+    }
+
+}
+```
+
+
+
+### 2.2 修改代码 `portal.html`
+
+```html
+<!--                        <li><a href="login.html">登录</a></li>-->
+<!--                        <li><a href="reg.html">注册</a></li>-->
+<li><a th:href="@{/auth/member/to/login/page}">登录</a></li>
+<li><a th:href="@{/auth/member/to/reg/page}">注册</a></li>
+```
+
+
+
+### 2.3 新建 `member-reg.html` 注册页面
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661742933900-febbd4fc-ff6d-4b2a-9904-f8b58fbfeb3c.png)
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="https://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="keys" content="">
+    <meta name="author" content="">
+    <base th:href="@{/}">
+    <link rel="stylesheet" href="bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/font-awesome.min.css">
+    <link rel="stylesheet" href="css/login.css">
+    <script type="text/javascript" src="jquery/jquery-2.1.1.min.js"></script>
+    <script type="text/javascript" src="bootstrap/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="layer/layer.js"></script>
+    <script type="text/javascript">
+        // layer.msg("aaa...");
+
+        $(function () {
+            $("#sendBtn").click(function () {
+                // 1. 获取接送短信的手机号码
+                let phoneNum = $.trim($("[name=phoneNum]").val());
+
+                // 2. 发送请求
+                $.ajax({
+                    url: "auth/member/send/short/message.json",
+                    type: "post",
+                    data: {
+                        phoneNum: phoneNum
+                    },
+                    dataType: "json",
+                    success: function (response) {
+                        var result = response.result;
+                        if ("SUCCESS" === result) {
+                            layer.msg("发送成功")
+                        }
+
+                        if ("FAILED" === result) {
+                            layer.msg("发送失败, 请重试")
+                        }
+                    },
+                    error: function (response) {
+                        layer.msg(response.status + " " + response.statusText);
+                    }
+                })
+            })
+        })
+    </script>
+</head>
+<body>
+<nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+    <div class="container">
+        <div class="navbar-header">
+            <div><a class="navbar-brand" th:href="@{/}" style="font-size:32px;">尚筹网-创意产品众筹平台</a></div>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+
+    <form action="/auth/do/member/register" method="post" class="form-signin" role="form">
+        <h2 class="form-signin-heading"><i class="glyphicon glyphicon-log-in"></i> 用户注册</h2>
+        <p th:text="${message}">这里显示从请求域取出的提示消息</p>
+        <div class="form-group has-success has-feedback">
+            <input type="text" class="form-control" id="loginacct" name="loginacct" placeholder="请输入登录账号" autofocus>
+            <span class="glyphicon glyphicon-user form-control-feedback"></span>
+        </div>
+        <div class="form-group has-success has-feedback">
+            <input type="text" class="form-control" id="userpswd" name="userpswd" placeholder="请输入登录密码"
+                   style="margin-top:10px;">
+            <span class="glyphicon glyphicon-lock form-control-feedback"></span>
+        </div>
+        <div class="form-group has-success has-feedback">
+            <input type="text" class="form-control" id="username" name="username" placeholder="请输入登录昵称" autofocus>
+            <span class="glyphicon glyphicon-user form-control-feedback"></span>
+        </div>
+        <div class="form-group has-success has-feedback">
+            <input type="text" class="form-control" id="email" name="email" placeholder="请输入邮箱地址"
+                   style="margin-top:10px;">
+            <span class="glyphicon glyphicon glyphicon-envelope form-control-feedback"></span>
+        </div>
+        <div class="form-group has-success has-feedback">
+            <input type="text" class="form-control" id="phoneNum" name="phoneNum" placeholder="请输入手机号"
+                   style="margin-top:10px;">
+            <span class="glyphicon glyphicon glyphicon-earphone form-control-feedback"></span>
+        </div>
+        <div class="form-group has-success has-feedback">
+            <input type="text" class="form-control" id="code" name="code" placeholder="请输入验证码" style="margin-top:10px;">
+            <span class="glyphicon glyphicon glyphicon-comment form-control-feedback"></span>
+        </div>
+        <button id="sendBtn" type="button" class="btn btn-lg btn-success btn-block"> 获取验证码</button>
+        <button type="submit" class="btn btn-lg btn-success btn-block"> 注册</button>
+    </form>
+
+</div>
+
+</body>
+</html>
+```
+
+
+
+#### 2.3.1 添加 `layer`到 `static` 下 [📎layer.zip](https://www.yuque.com/attachments/yuque/0/2022/zip/12811585/1661304823359-ba71611a-3f5d-482b-ad14-5451941d27a6.zip)
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661741626640-e781ac6d-c56d-4fe4-b722-59e628c8b5d9.png)
+
+
+
+### 2.4 追加依赖
+
+```xml
+<!-- 导入配置文件处理器, 配置文件进行绑定 -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-configuration-processor</artifactId>
+    <optional>true</optional>
+</dependency>
+```
+
+
+
+### 2.5 新建 `ShortMessageProperties` 类
+
+```java
+package com.atguigu.crowd.config;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
+
+/**
+ * 第三方短信接口属性
+ *
+ * @author 陈江林
+ * @date 2022/8/29 11:24
+ */
+@NoArgsConstructor
+@AllArgsConstructor
+@Data
+@Component
+@ConfigurationProperties(prefix = "short.message")
+public class ShortMessageProperties {
+
+    private String appCode;
+    private String templateId;
+    private String host;
+    private String method;
+    private String path;
+
+}
+```
+
+
+
+### 2.6 追加配置
+
+```yaml
+# 第三方短信接口
+short:
+  message:
+    app-code: 1948fa6afc674ea3bc2fea47f36e1108
+    host: https://dfsns.market.alicloudapi.com
+    path: /data/send_sms
+    method: POST
+```
+
+
+
+### 2.7 新建 `MemberHandler` 发送短信
+
+```java
+package com.atguigu.crowd.handler;
+
+import com.atguigu.crowd.api.RedisRemoteService;
+import com.atguigu.crowd.config.ShortMessageProperties;
+import com.atguigu.crowd.constant.CrowdConstant;
+import com.atguigu.crowd.util.CrowdUtil;
+import com.atguigu.crowd.util.ResultEntity;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import java.util.concurrent.TimeUnit;
+
+/**
+ * @author 陈江林
+ * @date 2022/8/29 11:21
+ */
+@Controller
+public class MemberHandler {
+
+    @Autowired
+    private ShortMessageProperties shortMessageProperties;
+
+    @Autowired
+    private RedisRemoteService redisRemoteService;
+
+    /**
+     * 发送短信验证码
+     *
+     * @param phoneNum 手机号码
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping("/auth/member/send/short/message.json")
+    public ResultEntity<String> sendMessage(
+            @RequestParam("phoneNum") String phoneNum) {
+        try {
+            // 1. 发送验证码
+            ResultEntity<String> sendMessageResultEntity = CrowdUtil.sendShortMessage(
+                    shortMessageProperties.getAppCode(),
+                    shortMessageProperties.getTemplateId(),
+                    shortMessageProperties.getHost(),
+                    shortMessageProperties.getPath(),
+                    shortMessageProperties.getMethod(),
+                    phoneNum
+            );
+
+            // 2. 判断发送结果
+            if(ResultEntity.SUCCESS.equals(sendMessageResultEntity.getResult())) {
+                // 3. 成功: 将验证码存入 Redis
+                String code = sendMessageResultEntity.getData();
+                String key = CrowdConstant.REDIS_CODE_PREFIX + phoneNum;
+                ResultEntity<String> saveCodeResultEntity = redisRemoteService.setRedisKeyValueRemoteWithTimeout(key, code, 15, TimeUnit.MINUTES);
+                if(ResultEntity.SUCCESS.equals(saveCodeResultEntity.getResult())) {
+                    return ResultEntity.successWithoutData();
+                } else {
+                    return saveCodeResultEntity;
+                }
+            } else {
+                return sendMessageResultEntity;
+            }
+        } catch (Exception e){
+            return ResultEntity.failed(e.getMessage());
+        }
+    }
+}
+```
+
+
+
+### 2.8 追加代码 `CrowdConstant`【`common`】
+
+```java
+public static final String REDIS_CODE_PREFIX = "REDIS_CODE_PREFIX_";
+```
+
+
+
+## 3. 执行注册流程
+
+- 如果针对注册操作所做的各项验证能够通过, 则将 Member 信息存入数据库
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661318337459-34acb207-e4f6-442c-bcc7-d6535d5bcc1c.png)
+
+
+
+- **操作**: 给 `t_member` 表中字段 `loginacct` 设置唯一
+
+### 3.1 追加代码 `MySQLRemoteService`【`API` 工程】
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661753173442-0bc49c95-f1ee-40e2-8638-f9fe7685858c.png)
+
+```java
+/**
+ * 保存
+ *
+ * @param memberPO 会员实体类
+ * @return
+ */
+@RequestMapping("/save/member/remote")
+ResultEntity<String> saveMember(@RequestBody MemberPO memberPO);
+```
+
+
+
+### 3.2 `MySQL` 项目
+
+#### 3.2.1 追加代码 `MemberProviderHandler`
+
+```java
+/**
+ * 保存
+ *
+ * @param memberPO 会员实体类
+ * @return
+ */
+@RequestMapping("/save/member/remote")
+public ResultEntity<String> saveMember(@RequestBody MemberPO memberPO) {
+    try {
+        memberService.saveMember(memberPO);
+        return ResultEntity.successWithoutData();
+    } catch (Exception e) {
+        if (e instanceof DuplicateKeyException) {
+            return ResultEntity.failed(CrowdConstant.MESSAGE_LOGIN_ACCT_ALREADY_IN_USE);
+        }
+
+        return ResultEntity.failed(e.getMessage());
+    }
+}
+```
+
+
+
+#### 3.2.2 追加代码 `MemberService`
+
+```java
+/**
+ * 保存
+ *
+ * @param memberPO 会员实体类
+ * @return
+ */
+void saveMember(MemberPO memberPO);
+```
+
+
+
+#### 3.2.3 追加代码 `MemberServiceImpl`
+
+```java
+@Transactional(
+    propagation = Propagation.REQUIRES_NEW, 
+    rollbackFor = Exception.class
+)
+@Override
+public void saveMember(MemberPO memberPO) {
+    memberPOMapper.insert(memberPO);
+}
+```
+
+
+
+### 3.3 测试 `http://localhost:2000/save/member/remote`
+
+- `body`: `{"loginacct": "tom","userpswd": "123"}`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661762061989-533b9ba6-7d23-46bc-aecb-164a9a1e141e.png)
+
+- `Content-Type`: `application/json;charset=utf-8`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661319471006-2d33c481-848c-4fc9-b2d2-47390293465e.png)
+
+- 结果
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661762078859-d289e693-501b-4702-837c-6bfdbef7310c.png)
+
+
+
+### 3.4 `Entity` 工程
+
+#### 3.4.1 新建 `MemberVO` 封装表单数据
+
+```java
+package com.atguigu.crowd.entity.vo;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * @author 陈江林
+ * @date 2022/8/29 16:35
+ */
+@NoArgsConstructor
+@AllArgsConstructor
+@Data
+public class MemberVO {
+
+    private String loginacct;
+
+    private String userpswd;
+
+    private String username;
+
+    private String email;
+
+    private String phoneNum;
+
+    private String code;
+
+}
+```
+
+
+
+### 3.5 `Auth` 项目
+
+#### 3.5.1 追加代码 `MemberHandler`
+
+```java
+@RequestMapping("/auth/do/member/register")
+public String register(MemberVO memberVO, ModelMap modelMape) {
+    // 1. 获取用户输入的手机号码
+    String phoneNum = memberVO.getPhoneNum();
+    
+    // 2. 拼 Redis 中存储验证码的 Key
+    String key = CrowdConstant.REDIS_CODE_PREFIX + phoneNum;
+    
+    // 3. 从 Redis 读取 Key 对应的 Value
+    ResultEntity<String> resultEntity = redisRemoteService.getRedisStringValue(key);
+    
+    // 4. 检查查询操作是否有效
+    String result = resultEntity.getResult();
+    if(resultEntity.FAILD.equals(result)) {
+        // ATTR_NAME_MESSAGE = message;
+        modelMape.addAttribute(CrowdConstant.ATTR_NAME_MESSAGE, resultEntity.getMessage());
+        return "member-reg";
+    }
+        
+    String redisCode = resultEntity.getData();
+    
+    if(redisCode == null) {
+        // MESSAGE_CODE_NOT_EXISTS = 验证码已过期!请检查手机号码是否正确或重新发送!
+        modelMape.addAttribute(CrowdConstant.ATTR_NAME_MESSAGE, CrowdConstant.MESSAGE_CODE_NOT_EXISTS);
+        return "member-reg";
+    }
+    
+    // 5. 如果从 Redis 能够查询到 Value 则比较表单的验证码和 Redis 的验证码
+    String formCode = memberVO.getCode();
+    
+    if(!Object.equals(formCode, redisCode)) {
+        // MESSAGE_CODE_INVALID = 验证码不正确!
+        modelMape.addAttribute(CrowdConstant.ATTR_NAME_MESSAGE, CrowdConstant.MESSAGE_CODE_INVALID);
+        return "member-reg";
+    }
+    
+    // 6. 如果验证码一致则从 Redis 删除
+    redisRemoteService.removeRedisKeyRemote(key);
+    
+    // 7. 执行密码加密
+    BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
+    String userpswdBeforeEncode = memberVO.getUserpswd();
+    String userpswdAfterEncode = bCryptPasswordEncoder.encode(userpswdBeforeEncode);
+    
+    memberVO.serUserpswd(userpswdAfterEncode);
+    // 8. 执行保存
+    // 8.1 创建空的 memberPO 对象
+    MemberPO memberPO = new MemberPO();
+    
+    // 8.2 复制属性
+    BeanUtils.copyProperties(memberVO, memberPO);
+    
+    // 8.3 调用远程的方法
+    ResultEntity<String> saveMemberResultEntity = mysqlRemoteService.saveMember(memberPO);
+    if(saveMemberResultEntity.FAILD.equals(result)) {
+        modelMape.addAttribute(CrowdConstant.ATTR_NAME_MESSAGE, saveMemberResultEntity.getMessage());
+        return "member-reg";
+    }
+    
+    // 使用重定向避免刷新浏览器导致重新执行注册流程
+    return "redirect:/auth/member/to/login/page";
+}
+```
+
+
+
+#### 3.5.2 登录页面 `member-login.html`
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="https://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="keys" content="">
+    <meta name="author" content="">
+    <base th:href="@{/}">
+    <link rel="stylesheet" href="bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/font-awesome.min.css">
+    <link rel="stylesheet" href="css/login.css">
+    <script src="jquery/jquery-2.1.1.min.js"></script>
+    <script src="bootstrap/js/bootstrap.min.js"></script>
+</head>
+<body>
+<nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+    <div class="container">
+        <div class="navbar-header">
+            <div><a class="navbar-brand" th:href="@{/}" style="font-size:32px;">尚筹网-创意产品众筹平台</a></div>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+
+    <form class="form-signin" role="form">
+        <h2 class="form-signin-heading"><i class="glyphicon glyphicon-log-in"></i> 用户登录</h2>
+        <div class="form-group has-success has-feedback">
+            <input type="text" class="form-control" id="loginacct" name="loginacct" placeholder="请输入登录账号" autofocus>
+            <span class="glyphicon glyphicon-user form-control-feedback"></span>
+        </div>
+        <div class="form-group has-success has-feedback">
+            <input type="text" class="form-control" id="userpswd" name="userpswd" placeholder="请输入登录密码"
+                   style="margin-top:10px;">
+            <span class="glyphicon glyphicon-lock form-control-feedback"></span>
+        </div>
+        <div class="checkbox" style="text-align:right;"><a th:href="@{/auth/member/to/reg/page}">我要注册</a></div>
+        <button type="submit" class="btn btn-lg btn-success btn-block">登录</button>
+    </form>
+</div>
+
+</body>
+</html>
+```
+
+
+
+### 3.6 `Common` 工程
+
+#### 3.6.1 追加代码 `CrowdContant`
+
+```java
+public static final String MESSAGE_CODE_NOT_EXISTS = "验证码已过期!请检查手机号码是否正确或重新发送!";
+public static final String MESSAGE_CODE_INVALID = "验证码不正确!";
+
+public static final String REDIS_CODE_PREFIX = "REDIS_CODE_PREFIX_";
+public static final String ATTR_NAME_MESSAGE = "message";
 ```
