@@ -1,8 +1,4 @@
-# atcrowdfunding07-member-parent
-尚筹网会员系统
-
 - [十六 会员系统-搭建环境](#十六-会员系统-搭建环境)
-    - [扩展: SpringBoot 热部署](#扩展-springboot-热部署)
     - [1. 尚筹网会员系统总目标](#1-尚筹网会员系统总目标)
     - [2. 会员系统架构](#2-会员系统架构)
         - [2.1 架构图](#21-架构图)
@@ -46,7 +42,8 @@
             - [7.2.1 查看 `Redis`](#721-查看-redis)
         - [7.3 工程依赖](#73-工程依赖)
         - [7.4 主启动类](#74-主启动类)
-        - [7.5 测试类](#75-测试类)
+        - [7.5 新建 `application.yml` 配置](#75-新建-applicationyml-配置)
+        - [7.6 测试类](#76-测试类)
     - [8. `Redis` 工程对外暴露服务](#8-redis-工程对外暴露服务)
         - [8.1 `API` 工程](#81-api-工程)
             - [8.1.1 新建 `RedisRemoteService`接口](#811-新建-redisremoteservice接口)
@@ -69,22 +66,6 @@
     - [11. 关于第一次请求超时](#11-关于第一次请求超时)
 
 # 十六 会员系统-搭建环境
-
-## 扩展: SpringBoot 热部署
-
-```xml
-<dependency>
-  <groupId>org.springframework.boot</groupId>
-  <actifactId>spring-boot-devtools</actifactId>
-</dependency>
-
-<dependency>
-  <groupId>org.springframework.boot</groupId>
-  <actifactId>spring-boot-loader</actifactId>
-</dependency>
-```
-
-
 
 ## 1. 尚筹网会员系统总目标
 
@@ -2291,9 +2272,27 @@ public class CrowdMainClass {
 }
 ```
 
+### 7.5 新建 `application.yml` 配置
+
+```yaml
+server:
+  port: 3000
+
+spring:
+  application:
+    name: atguigu-crowd-redis
+  redis:
+    host: 127.0.0.1
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:1000/eureka
+```
 
 
-### 7.5 测试类
+
+### 7.6 测试类
 
 ![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660955755275-432e9dd7-f4ca-4f41-9b66-7bf765b03458.png)
 
@@ -2362,26 +2361,26 @@ public interface RedisRemoteService {
 
     /**
      * 保存
-     * 
+     *
      * @param key
      * @param value
      * @return
      */
-    @RequestMapping("/set/Redis/Key/Value/Remote")
+    @RequestMapping("/set/redis/key/value/remote")
     ResultEntity<String> setRedisKeyValueRemote(
             @RequestParam("key") String key,
             @RequestParam("value") String value);
 
     /**
      * 设置带超时时间的
-     * 
+     *
      * @param key
      * @param value
      * @param time  时间
      * @param timeUnit 时间单位
      * @return
      */
-    @RequestMapping("/set/Redis/Key/Value/Remote/With/Timeout")
+    @RequestMapping("/set/redis/key/value/remote/with/timeout")
     ResultEntity<String> setRedisKeyValueRemoteWithTimeout(
             @RequestParam("key") String key,
             @RequestParam("value") String value,
@@ -2390,20 +2389,20 @@ public interface RedisRemoteService {
 
     /**
      * 根据 Key 获取
-     * 
+     *
      * @param key
      * @return
      */
-    @RequestMapping("get/Redis/Key/Value/By/Key")
+    @RequestMapping("get/redis/key/value/by/key")
     ResultEntity<String> getRedisKeyValueByKey(@RequestParam("key") String key);
 
     /**
      * 根据 Key 删除
-     * 
+     *
      * @param key
      * @return
      */
-    @RequestMapping("remove/Redis/Key/Remote")
+    @RequestMapping("remove/redis/key/remote")
     ResultEntity<String> removeRedisKeyRemote(@RequestParam("key") String key);
 
 }
@@ -2422,10 +2421,23 @@ public interface RedisRemoteService {
   <artifactId>spring-boot-starter-web</artifactId>
 </dependency>
 
+<!-- 作为客户端访问 Eureka 注册中心 -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+</dependency>
+
 <!-- 为了能够使用工具类 -->
 <dependency>
     <groupId>com.atguigu.crowd</groupId>
     <artifactId>atcrowdfunding05-common-util</artifactId>
+    <version>1.0-SNAPSHOT</version>
+</dependency>
+
+<!-- 为能够使用实体类 -->
+<dependency>
+    <groupId>com.atguigu.crowd</groupId>
+    <artifactId>atcrowdfunding09-member-entity</artifactId>
     <version>1.0-SNAPSHOT</version>
 </dependency>
 ```
@@ -2481,12 +2493,12 @@ public class RedisHandler {
 
     /**
      * 保存
-     * 
+     *
      * @param key
      * @param value
      * @return
      */
-    @RequestMapping("/set/Redis/Key/Value/Remote")
+    @RequestMapping("/set/redis/key/value/remote")
     ResultEntity<String> setRedisKeyValueRemote(
             @RequestParam("key") String key,
             @RequestParam("value") String value) {
@@ -2502,14 +2514,14 @@ public class RedisHandler {
 
     /**
      * 设置带超时时间的
-     * 
+     *
      * @param key
      * @param value
      * @param time 时间
      * @param timeUnit 时间单位
      * @return
      */
-    @RequestMapping("/set/Redis/Key/Value/Remote/With/Timeout")
+    @RequestMapping("/set/redis/key/value/remote/with/timeout")
     ResultEntity<String> setRedisKeyValueRemoteWithTimeout(
             @RequestParam("key") String key,
             @RequestParam("value") String value,
@@ -2527,11 +2539,11 @@ public class RedisHandler {
 
     /**
      * 根据 Key 获取
-     * 
+     *
      * @param key
      * @return
      */
-    @RequestMapping("get/Redis/Key/Value/By/Key")
+    @RequestMapping("get/redis/key/value/by/key")
     ResultEntity<String> getRedisKeyValueByKey(@RequestParam("key") String key) {
         try {
             ValueOperations<String, String> operations = redisTemplate.opsForValue();
@@ -2545,11 +2557,11 @@ public class RedisHandler {
 
     /**
      * 根据 Key 删除
-     * 
+     *
      * @param key
      * @return
      */
-    @RequestMapping("remove/Redis/Key/Remote")
+    @RequestMapping("remove/redis/key/remote")
     ResultEntity<String> removeRedisKeyRemote(@RequestParam("key") String key) {
         try {
             redisTemplate.delete(key);
@@ -3642,29 +3654,29 @@ public class PortalHandler {
         <groupId>org.springframework.cloud</groupId>
         <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
     </dependency>
-    
+
     <!-- 整合 Zuul 网关 -->
-  	<dependency>
-			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-starter-netflix-zuul</artifactId>
-		</dependency>
+    <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-starter-netflix-zuul</artifactId>
+    </dependency>
 </dependencies>
 
 <build>
-    <plugins>
-        <!-- 这个插件将 SpringBoot 应用打包成一个可执行的 jar 包 -->
-        <plugin>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-maven-plugin</artifactId>
-            <executions>
-                <execution>
-                    <goals>
-                        <goal>repackage</goal>
-                    </goals>
-                </execution>
-            </executions>
-        </plugin>
-    </plugins>
+<plugins>
+    <!-- 这个插件将 SpringBoot 应用打包成一个可执行的 jar 包 -->
+    <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <executions>
+            <execution>
+                <goals>
+                    <goal>repackage</goal>
+                </goals>
+            </execution>
+        </executions>
+    </plugin>
+</plugins>
 </build>
 ```
 
@@ -3681,7 +3693,7 @@ import org.springframework.cloud.netflix.zuul.EnableZuulProxy;
 
 /**
  * `@EnableZuulProxy` 启动 zuul 代理功能
- * 
+ *
  * @author 陈江林
  * @date 2022/8/28 22:26
  */
