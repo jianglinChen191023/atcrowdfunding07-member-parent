@@ -33,7 +33,7 @@ public class CrowdTest {
         Map<String, String> querys = new HashMap<>();
         Map<String, String> bodys = new HashMap<>();
         bodys.put("content", "code:1234");
-        bodys.put("phone_number", "185xxxx5080");
+        bodys.put("phone_number", "185xxxxxxxx");
         bodys.put("template_id", "TPL_0000");
 
         try {
