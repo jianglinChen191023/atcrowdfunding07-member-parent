@@ -5,6 +5,7 @@ import com.atguigu.crowd.api.RedisRemoteService;
 import com.atguigu.crowd.config.ShortMessageProperties;
 import com.atguigu.crowd.constant.CrowdConstant;
 import com.atguigu.crowd.entity.po.MemberPO;
+import com.atguigu.crowd.entity.vo.MemberLoginVO;
 import com.atguigu.crowd.entity.vo.MemberVO;
 import com.atguigu.crowd.util.CrowdUtil;
 import com.atguigu.crowd.util.ResultEntity;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import javax.servlet.http.HttpSession;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -37,6 +39,60 @@ public class MemberHandler {
     private MySQLRemoteService mySQLRemoteService;
 
     /**
+     * 退出登录
+     *
+     * @param session
+     * @return
+     */
+    @RequestMapping("/auth/member/logout")
+    public String logout(HttpSession session) {
+
+        session.invalidate();
+
+        return "redirect:" + CrowdConstant.ZUUL_PATH_VALUE + "/";
+    }
+
+    /**
+     * 会员登录
+     *
+     * @param loginacct 账户
+     * @param userpswd  密码
+     * @param modelMap
+     * @param session
+     * @return
+     */
+    @RequestMapping("/auth/member/do/login")
+    public String doLogin(
+            @RequestParam("loginacct") String loginacct,
+            @RequestParam("userpswd") String userpswd,
+            ModelMap modelMap,
+            HttpSession session) {
+        ResultEntity<MemberPO> resultEntity = mySQLRemoteService.getMemberPOByLoginAcctRemote(loginacct);
+        if (ResultEntity.FAILED.equals(resultEntity.getResult())) {
+            modelMap.addAttribute(CrowdConstant.ATTR_NAME_MESSAGE, resultEntity.getMessage());
+            return "member-login";
+        }
+
+        MemberPO memberPO = resultEntity.getData();
+        if (memberPO == null) {
+            modelMap.addAttribute(CrowdConstant.ATTR_NAME_MESSAGE, CrowdConstant.MESSAGE_LOGIN_FAILED);
+            return "member-login";
+        }
+
+        // 2. 比较密码
+        String userpswdDataBase = memberPO.getUserpswd();
+
+        BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
+        bCryptPasswordEncoder.matches(userpswd, userpswdDataBase);
+
+        // 3. 创建 MemberLoginVO 对象传入 Session 域
+        MemberLoginVO memberLoginVO = new MemberLoginVO(memberPO.getId(), memberPO.getUsername(), memberPO.getEmail());
+        // ATTR_NAME_LOGIN_MEMBER = loginMember
+        session.setAttribute(CrowdConstant.ATTR_NAME_LOGIN_MEMBER, memberLoginVO);
+
+        return "redirect:" + CrowdConstant.ZUUL_PATH_VALUE + "/auth/member/to/conter/page";
+    }
+
     /**
      * 执行注册
      *
@@ -103,7 +159,7 @@ public class MemberHandler {
         }
 
         // 使用重定向避免刷新浏览器导致重新执行注册流程
-        return "redirect:/auth/member/to/login/page";
+        return "redirect:" + CrowdConstant.ZUUL_PATH_VALUE + "/auth/member/to/login/page";
     }
 
     /**

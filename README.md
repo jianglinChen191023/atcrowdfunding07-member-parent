@@ -98,6 +98,58 @@
         - [3.6 `Common` 工程](#36-common-工程)
             - [3.6.1 追加代码 `CrowdContant`](#361-追加代码-crowdcontant)
 
+- [十八 会员登录](#十八-会员登录)
+    - [1. 登录流程](#1-登录流程)
+        - [1.1 `Entity`](#11-entity)
+            - [1.1.1 新建 `MemberLoginVO`](#111-新建-memberloginvo)
+        - [1.2 `Auth` 工程](#12-auth-工程)
+            - [1.2.1 修改代码 `member-login.html`](#121-修改代码-member-loginhtml)
+            - [1.2.2 追加代码 `MemberHandler`](#122-追加代码-memberhandler)
+            - [1.2.3 追加代码 `CrowdWebMvcConfig` 设置跳转页面](#123-追加代码-crowdwebmvcconfig-设置跳转页面)
+            - [1.2.4 新建页面 `member-conter.html`](#124-新建页面-member-conterhtml)
+    - [2. 会员退出登录](#2-会员退出登录)
+        - [2.1 `auth` 工程](#21-auth-工程)
+            - [2.1.1 修改代码`member-conter.html`](#211-修改代码member-conterhtml)
+            - [2.1.2 追加代码 `MemberHandler`](#212-追加代码-memberhandler)
+    - [3. 知识点: Session 共享, 解决 Session 不互通的问题](#3-知识点-session-共享-解决-session-不互通的问题)
+        - [3.1 会话控制回顾](#31-会话控制回顾)
+            - [3.1.1 Cookie 的工作机制](#311-cookie-的工作机制)
+            - [3.1.2 Session 的工作机制](#312-session-的工作机制)
+        - [3.2 解决方案探索](#32-解决方案探索)
+            - [3.2.1 Session 同步](#321-session-同步)
+            - [3.2.2 将 `Session` 数据存储在 `Cookie` 中](#322-将-session-数据存储在-cookie-中)
+            - [3.2.3 反向代理 `hash` 一致性](#323-反向代理-hash-一致性)
+            - [3.2.4 后端统一存储 Session 数据](#324-后端统一存储-session-数据)
+        - [3.3 `SpringSession` 使用](#33-springsession-使用)
+            - [3.3.1 共同代码](#331-共同代码)
+                - [3.3.1.1 引入依赖](#3311-引入依赖)
+                - [3.3.1.2 新建 `MainClass` 主启动类](#3312-新建-mainclass-主启动类)
+                - [3.3.1.3 新建 `application.yml` 配置](#3313-新建-applicationyml-配置)
+            - [3.3.2 `pro18-spring-session-a`](#332-pro18-spring-session-a)
+                - [3.3.2.1 新建 `HelloHandler` 类](#3321-新建-hellohandler-类)
+            - [3.3.3 `pro18-spring-session-b`](#333-pro18-spring-session-b)
+                - [3.3.3.1 新建`HelloHandler`类](#3331-新建hellohandler类)
+        - [3.4 `SpringSession` 基本原理](#34-springsession-基本原理)
+            - [3.4.1 `SpringSession` 需要完成的任务](#341-springsession-需要完成的任务)
+            - [3.4.2 `SessionRepositoryFilter`](#342-sessionrepositoryfilter)
+    - [4. 星图/架构图](#4-星图架构图)
+    - [5. 登录检查](#5-登录检查)
+        - [5.1 代码: 设置 `Session` 共享](#51-代码-设置-session-共享)
+            - [5.1.1 `zuul、auth` 工程](#511-zuulauth-工程)
+        - [5.2 代码: 准备不需要登录检查的资源](#52-代码-准备不需要登录检查的资源)
+            - [5.2.1 新建 `AccessPassResources` 类](#521-新建-accesspassresources-类)
+        - [5.3 代码: `zuul` 工程](#53-代码-zuul-工程)
+            - [5.3.1 新建 `CrowdAccessFilter` 类](#531-新建-crowdaccessfilter-类)
+            - [5.3.2 追加依赖](#532-追加依赖)
+        - [5.4 `auth` 工程](#54-auth-工程)
+            - [5.4.1 追加代码 `member-login.html`](#541-追加代码-member-loginhtml)
+    - [6 修改重定向地址, 使用 `zuul`](#6-修改重定向地址-使用-zuul)
+        - [6.1 因为 `Cookie` 问题不能使用重定向跨项目跳转, 所以集中访问 `zuul` 来进行重定向](#61-因为-cookie-问题不能使用重定向跨项目跳转-所以集中访问-zuul-来进行重定向)
+        - [6.2 前端重定向地址, 使用 Session 共享存储 `zuul` 地址解决](#62-前端重定向地址-使用-session-共享存储-zuul-地址解决)
+            - [6.2.1 项目启动自动存储 `zuul` 地址](#621-项目启动自动存储-zuul-地址)
+            - [6.2.2 追加代码 `CrowdConstant` 【`common`工程】](#622-追加代码-crowdconstant-common工程)
+            - [6.2.3 前端重定向可以使用 `${session.zuulPath}`获取地址](#623-前端重定向可以使用-sessionzuulpath获取地址)
+
 
 # 十六 会员系统-搭建环境
 
@@ -4896,3 +4948,1446 @@ public static final String MESSAGE_CODE_INVALID = "验证码不正确!";
 public static final String REDIS_CODE_PREFIX = "REDIS_CODE_PREFIX_";
 public static final String ATTR_NAME_MESSAGE = "message";
 ```
+
+
+
+
+# 十八 会员登录
+
+```
+git checkout -b 18.0.0_member_login
+```
+
+## 1. 登录流程
+
+- 检查账号密码正确后将用户信息存入 `Session`, 表示用户已登录
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661501170375-e4fa33c7-9564-4a02-8e2e-6f8988022eef.png)
+
+
+
+### 1.1 `Entity`
+
+#### 1.1.1 新建 `MemberLoginVO`
+
+```java
+package com.atguigu.crowd.entity.vo;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.io.Serializable;
+
+/**
+ * @author 陈江林
+ * @date 2022/8/29 21:09
+ */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class MemberLoginVO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    private Integer id;
+
+    private String username;
+
+    private String email;
+
+}
+```
+
+
+
+
+
+### 1.2 `Auth` 工程
+
+#### 1.2.1 修改代码 `member-login.html`
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="https://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="keys" content="">
+    <meta name="author" content="">
+    <base th:href="@{/}">
+    <link rel="stylesheet" href="bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/font-awesome.min.css">
+    <link rel="stylesheet" href="css/login.css">
+    <script src="jquery/jquery-2.1.1.min.js"></script>
+    <script src="bootstrap/js/bootstrap.min.js"></script>
+</head>
+<body>
+<nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+    <div class="container">
+        <div class="navbar-header">
+            <div><a class="navbar-brand" th:href="@{/}" style="font-size:32px;">尚筹网-创意产品众筹平台</a></div>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+    <form action="/auth/member/do/login" method="post" class="form-signin" role="form">
+        <h2 class="form-signin-heading"><i class="glyphicon glyphicon-log-in"></i> 用户登录</h2>
+        <p th:text="${message}">这里显示从请求域取出的提示消息</p>
+        <div class="form-group has-success has-feedback">
+            <input type="text" class="form-control" id="loginacct" name="loginacct" placeholder="请输入登录账号" autofocus>
+            <span class="glyphicon glyphicon-user form-control-feedback"></span>
+        </div>
+        <div class="form-group has-success has-feedback">
+            <input type="text" class="form-control" id="userpswd" name="userpswd" placeholder="请输入登录密码"
+                   style="margin-top:10px;">
+            <span class="glyphicon glyphicon-lock form-control-feedback"></span>
+        </div>
+        <div class="checkbox" style="text-align:right;"><a th:href="@{/auth/member/to/reg/page}">我要注册</a></div>
+        <button type="submit" class="btn btn-lg btn-success btn-block">登录</button>
+    </form>
+</div>
+
+</body>
+</html>
+```
+
+
+
+#### 1.2.2 追加代码 `MemberHandler`
+
+```java
+/**
+ * 会员登录
+ *
+ * @param loginacct 账户
+ * @param userpswd 密码
+ * @param modelMap
+ * @param session
+ * @return
+ */
+@RequestMapping("/auth/member/do/login")
+public String doLogin(
+        @RequestParam("loginacct") String loginacct,
+        @RequestParam("userpswd") String userpswd,
+        ModelMap modelMap,
+        HttpSession session) {
+    ResultEntity<MemberPO> resultEntity = mySQLRemoteService.getMemberPOByLoginAcctRemote(loginacct);
+    if (ResultEntity.FAILED.equals(resultEntity.getResult())) {
+        modelMap.addAttribute(CrowdConstant.ATTR_NAME_MESSAGE, resultEntity.getMessage());
+        return "member-login";
+    }
+
+    MemberPO memberPO = resultEntity.getData();
+    if (memberPO == null) {
+        modelMap.addAttribute(CrowdConstant.ATTR_NAME_MESSAGE, CrowdConstant.MESSAGE_LOGIN_FAILED);
+        return "member-login";
+    }
+
+    // 2. 比较密码
+    String userpswdDataBase = memberPO.getUserpswd();
+
+    BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
+    bCryptPasswordEncoder.matches(userpswd, userpswdDataBase);
+
+    // 3. 创建 MemberLoginVO 对象传入 Session 域
+    MemberLoginVO memberLoginVO = new MemberLoginVO(memberPO.getId(), memberPO.getUsername(), memberPO.getEmail());
+    // ATTR_NAME_LOGIN_MEMBER = loginMember
+    session.setAttribute(CrowdConstant.ATTR_NAME_LOGIN_MEMBER, memberLoginVO);
+
+    return "redirect:/auth/member/to/conter/page";
+}
+```
+
+
+
+#### 1.2.3 追加代码 `CrowdWebMvcConfig` 设置跳转页面
+
+```java
+registry.addViewController("/auth/member/to/conter/page").setViewName("member-conter");
+```
+
+
+
+#### 1.2.4 新建页面 `member-conter.html`
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="https://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <base th:href="@{/}">
+    <link rel="stylesheet" href="bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/font-awesome.min.css">
+    <link rel="stylesheet" href="css/theme.css">
+    <script src="jquery/jquery-2.1.1.min.js"></script>
+    <script src="bootstrap/js/bootstrap.min.js"></script>
+    <script src="script/docs.min.js"></script>
+    <script src="script/back-to-top.js"></script>
+    <script src="script/echarts.js"></script>
+    <style>
+        #footer {
+            padding: 15px 0;
+            background: #fff;
+            border-top: 1px solid #ddd;
+            text-align: center;
+        }
+
+        #topcontrol {
+            color: #fff;
+            z-index: 99;
+            width: 30px;
+            height: 30px;
+            font-size: 20px;
+            background: #222;
+            position: relative;
+            right: 14px !important;
+            bottom: 11px !important;
+            border-radius: 3px !important;
+        }
+
+        #topcontrol:after {
+            /*top: -2px;*/
+            left: 8.5px;
+            content: "\f106";
+            position: absolute;
+            text-align: center;
+            font-family: FontAwesome;
+        }
+
+        #topcontrol:hover {
+            color: #fff;
+            background: #18ba9b;
+            -webkit-transition: all 0.3s ease-in-out;
+            -moz-transition: all 0.3s ease-in-out;
+            -o-transition: all 0.3s ease-in-out;
+            transition: all 0.3s ease-in-out;
+        }
+
+    </style>
+</head>
+<body>
+<div class="navbar-wrapper">
+    <div class="container">
+        <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+            <div class="container">
+                <div class="navbar-header">
+                    <a class="navbar-brand" th:href="@{/}" style="font-size:32px;">尚筹网-创意产品众筹平台</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse" style="float:right;">
+                    <ul class="nav navbar-nav">
+                        <li class="dropdown">
+                            <a href="#" class="dropdown-toggle" data-toggle="dropdown"><i
+                                    class="glyphicon glyphicon-user"></i> [[${session.loginMember.username}]]<span
+                                    class="caret"></span></a>
+                            <ul class="dropdown-menu" role="menu">
+                                <li><a href="member.html"><i class="glyphicon glyphicon-scale"></i> 会员中心</a></li>
+                                <li><a href="#"><i class="glyphicon glyphicon-comment"></i> 消息</a></li>
+                                <li class="divider"></li>
+                                <li><a href="index.html"><i class="glyphicon glyphicon-off"></i> 退出系统</a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+    </div>
+</div>
+<div class="container">
+    <div class="row clearfix">
+        <div class="col-sm-3 col-md-3 column">
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="thumbnail" style="    border-radius: 0px;">
+                        <img src="img/services-box1.jpg" class="img-thumbnail" alt="">
+                        <div class="caption" style="text-align:center;">
+                            <h3>
+                                [[${session.loginMember.username}]]
+                            </h3>
+                            <span class="label label-danger" style="cursor:pointer;"
+                                  onclick="window.location.href='accttype.html'">未实名认证</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="list-group">
+                <div class="list-group-item active">
+                    资产总览<span class="badge"><i class="glyphicon glyphicon-chevron-right"></i></span>
+                </div>
+                <div class="list-group-item " style="cursor:pointer;"
+                     onclick="window.location.href='minecrowdfunding.html'">
+                    我的众筹<span class="badge"><i class="glyphicon glyphicon-chevron-right"></i></span>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-9 col-md-9 column">
+            <blockquote style="border-left: 5px solid #f60;color:#f60;padding: 0 0 0 20px;">
+                <b>
+                    我的钱包
+                </b>
+            </blockquote>
+            <div id="main" style="width: 600px;height:400px;"></div>
+            <blockquote style="border-left: 5px solid #f60;color:#f60;padding: 0 0 0 20px;">
+                <b>
+                    理财
+                </b>
+            </blockquote>
+            <div id="main1" style="width: 600px;height:400px;"></div>
+            <blockquote style="border-left: 5px solid #f60;color:#f60;padding: 0 0 0 20px;">
+                <b>
+                    比例
+                </b>
+            </blockquote>
+            <div id="main2" style="width: 600px;height:400px;"></div>
+        </div>
+    </div>
+</div>
+<div class="container" style="margin-top:20px;">
+    <div class="row clearfix">
+        <div class="col-md-12 column">
+            <div id="footer">
+                <div class="footerNav">
+                    <a rel="nofollow" href="http://www.atguigu.com">关于我们</a> | <a rel="nofollow"
+                                                                                  href="http://www.atguigu.com">服务条款</a>
+                    | <a rel="nofollow" href="http://www.atguigu.com">免责声明</a> | <a rel="nofollow"
+                                                                                    href="http://www.atguigu.com">网站地图</a>
+                    | <a rel="nofollow" href="http://www.atguigu.com">联系我们</a>
+                </div>
+                <div class="copyRight">
+                    Copyright ?2017-2017atguigu.com 版权所有
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    $('#myTab a').click(function (e) {
+        e.preventDefault()
+        $(this).tab('show')
+    })
+    $('#myTab1 a').click(function (e) {
+        e.preventDefault()
+        $(this).tab('show')
+    })
+
+    var myChart = echarts.init(document.getElementById('main'));
+
+    // 指定图表的配置项和数据
+    option = {
+        title: {
+            text: '七日年化收益率(%)'
+        },
+        tooltip: {
+            trigger: 'axis'
+        },
+        legend: {
+            data: ['基金', '股票']
+        },
+        toolbox: {
+            show: false,
+            feature: {
+                dataZoom: {
+                    yAxisIndex: 'none'
+                },
+                dataView: {readOnly: false},
+                magicType: {type: ['line', 'bar']},
+                restore: {},
+                saveAsImage: {}
+            }
+        },
+        xAxis: {
+            type: 'category',
+            boundaryGap: false,
+            data: ['2017-05-16', '2017-05-17', '2017-05-18', '2017-05-19', '2017-05-20', '2017-05-21', '2017-05-22']
+        },
+        yAxis: {
+            type: 'value',
+            axisLabel: {
+                formatter: '{value} '
+            }
+        },
+        series: [
+            {
+                name: '基金',
+                type: 'line',
+                data: [1, 1, 5, 3, 2, 3, 2],
+                markPoint: {
+                    data: [
+                        {type: 'max', name: '最大值'},
+                        {type: 'min', name: '最小值'}
+                    ]
+                },
+                markLine: {
+                    data: [
+                        {type: 'average', name: '平均值'}
+                    ]
+                }
+            },
+            {
+                name: '股票',
+                type: 'line',
+                data: [1, -2, 2, 5, 3, 2, 4],
+                markPoint: {
+                    data: [
+                        {name: '周最低', value: -2, xAxis: 1, yAxis: -1.5}
+                    ]
+                },
+                markLine: {
+                    data: [
+                        {type: 'average', name: '平均值'},
+                        [{
+                            symbol: 'none',
+                            x: '90%',
+                            yAxis: 'max'
+                        }, {
+                            symbol: 'circle',
+                            label: {
+                                normal: {
+                                    position: 'start',
+                                    formatter: '最大值'
+                                }
+                            },
+                            type: 'max',
+                            name: '最高点'
+                        }]
+                    ]
+                }
+            }
+        ]
+    };
+    myChart.setOption(option);
+    var myChart1 = echarts.init(document.getElementById('main1'));
+
+    // 指定图表的配置项和数据
+    option1 = {
+        color: ['#3398DB'],
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: {            // 坐标轴指示器，坐标轴触发有效
+                type: 'shadow'        // 默认为直线，可选为：'line' | 'shadow'
+            }
+        },
+        grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '3%',
+            containLabel: true
+        },
+        xAxis: [
+            {
+                type: 'category',
+                data: ['基金', '票据', '定期理财', '变现贷'],
+                axisTick: {
+                    alignWithLabel: true
+                }
+            }
+        ],
+        yAxis: [
+            {
+                type: 'value'
+            }
+        ],
+        series: [
+            {
+                name: '直接访问',
+                type: 'bar',
+                barWidth: '60%',
+                data: [10, 52, 200, 334, 390, 330, 220]
+            }
+        ]
+    };
+
+    // 使用刚指定的配置项和数据显示图表。
+    myChart1.setOption(option1);
+
+    var myChart2 = echarts.init(document.getElementById('main2'));
+
+    // 指定图表的配置项和数据
+    option2 = {
+        title: {
+            text: '某站点用户访问来源',
+            subtext: '纯属虚构',
+            x: 'center'
+        },
+        tooltip: {
+            trigger: 'item',
+            formatter: "{a} <br/>{b} : {c} ({d}%)"
+        },
+        legend: {
+            orient: 'vertical',
+            left: 'left',
+            data: ['直接访问', '邮件营销', '联盟广告', '视频广告', '搜索引擎']
+        },
+        series: [
+            {
+                name: '访问来源',
+                type: 'pie',
+                radius: '55%',
+                center: ['50%', '60%'],
+                data: [
+                    {value: 335, name: '直接访问'},
+                    {value: 310, name: '邮件营销'},
+                    {value: 234, name: '联盟广告'},
+                    {value: 135, name: '视频广告'},
+                    {value: 1548, name: '搜索引擎'}
+                ],
+                itemStyle: {
+                    emphasis: {
+                        shadowBlur: 10,
+                        shadowOffsetX: 0,
+                        shadowColor: 'rgba(0, 0, 0, 0.5)'
+                    }
+                }
+            }
+        ]
+    };
+
+    // 使用刚指定的配置项和数据显示图表。
+    myChart2.setOption(option2);
+</script>
+</body>
+</html>
+```
+
+
+
+## 2. 会员退出登录
+
+### 2.1 `auth` 工程
+
+#### 2.1.1 修改代码`member-conter.html`
+
+```html
+<!--<li><a href="index.html"><i class="glyphicon glyphicon-off"></i> 退出系统</a></li>-->
+<li><a th:href="@{/auth/member/logout}"><i class="glyphicon glyphicon-off"></i> 退出系统</a></li>
+```
+
+
+
+#### 2.1.2 追加代码 `MemberHandler`
+
+```java
+/**
+ * 退出登录
+ * 
+ * @param session
+ * @return
+ */
+@RequestMapping("/auth/member/logout")
+public String logout(HttpSession session) {
+
+    session.invalidate();
+
+    return "redirect:/";
+}
+```
+
+
+
+## 3. 知识点: Session 共享, 解决 Session 不互通的问题
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661512959472-2c320b0f-fa66-49a7-b6ef-2c79c3ac8131.png)
+
+- 在分布式和集群环境下,  每个具体模块运行在单独的 Tomcat 上, 而 Session 是被不同 Tomcat 所 "区隔" 的, 所以不能互通, 会导致程序运行时, 用户会话发生错误
+
+    - 有的服务器上有, 有的服务器上没有
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661514510084-6df436b4-7639-49f6-ba64-5b695c7f1e5e.png)
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661514533002-7fbb4bb6-851d-41c1-84c5-3158fd1f0c62.png)
+
+### 3.1 会话控制回顾
+
+- 浏览器: 发送 `Cookie` 数据
+- 服务器: 解析 `Cookie` 数据
+- 服务器: 查找对应的 `Session`, 如果没有则新建
+- 服务器: 把新建的 `Session` 存入 `Redis`
+
+========= ========
+
+- 浏览器: 请求要求在原有的 `Session` 中存入新数据
+- 服务器: 根据 `Cookie` 把旧的 `Session` 找到, 存入数据, 存回 Redis
+
+
+
+#### 3.1.1 Cookie 的工作机制
+
+- 服务器端返回 `Cookie` 信息给浏览器
+
+    - `Java` 代码: `response.addCookie(cookie 对象);`
+    - `Http` 响应消息头: `Set-Cookie`: `Cookie` 的名字 = `Cookie` 的值, 浏览器接收到服务器端返回的 `Cookie`, 以后的每一次请求都会把 `Cookie` 带上
+    - Http 请求消息头: `Cookie`: `Cookie` 的名字 = `Cookie` 的值
+
+
+
+#### 3.1.2 Session 的工作机制
+
+- 获取 `Session` 对象:` request.getSession();`
+
+    - 检查当前请求是否携带了 `JSESSIONID` 这个 `Cookie`
+
+        - 带了: 根据这个 `JSESSIONID` 在服务器端查找对应的 `Session` 对象
+
+            - 能找到: 就把找到的 `Seesion` 对象返回
+            - 没找到: 新建 `Session` 对象返回, 同时返回 `JSESSIONID` 的 `Cookie`
+
+        - 没带: 新建 `Session` 对象返回, 同时返回 `JSESSIONID` 的 `Cookie`
+
+
+
+### 3.2 解决方案探索
+
+#### 3.2.1 Session 同步
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661514573168-4b3e0b73-8e36-4e2b-bb18-aedb5fbf8c9d.png)![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661514589044-b0761750-12b5-478f-80cc-14ca350a0d0c.png)
+
+- 问题1: 造成 `Session` 在各个服务器上 "同量" 保存
+
+    - `TomcatA` 保存了 1G 的 `Session` 数据, `TomcatB` 也需要保存 1G 的 `Session` 数据
+    - 数据量太大的会导致 `Tomcat` 性能下降
+
+- 问题2: 数据同步对性能有一定影响
+- 问题3: 对应集群外的服务器无效
+
+
+
+#### 3.2.2 将 `Session` 数据存储在 `Cookie` 中
+
+- 做法: 所有会话数据在浏览器端使用 `Cookie` 保存, 服务器端不存储如何会话手机
+
+    - 好处: 服务器端大大减轻了数据存储的压力。不会有 `Session` 不一致的问题
+    - 缺点:
+
+        - `Cookie` 能够存储的数据非常有限。一般是 4KB。不能存储丰富的数据
+        - `Cookie` 数据在浏览器端存储, 很大程度上不受服务器端的控制, 如果浏览器端清理 `Cookie`, 相关数据会丢失
+
+
+
+#### 3.2.3 反向代理 `hash` 一致性
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661515160158-b2f4d58a-0d86-4c34-ae32-29b465222cd1.png)
+
+- 问题1: 具体一个浏览器, 专门访问某一个具体服务器, 如果浏览器宕机, 会丢失数据。存在单点故障风险
+- 问题2: 仅仅适用于集群范围内, 超出集群范围, 负载均衡服务器无效
+
+
+
+#### 3.2.4 后端统一存储 Session 数据
+
+- 后端存储 Session 数据时, 一般需要使用 Redis 这样的内存数据库，而一般不采用 MySQL 这样的关系型数据库。原因如下
+
+    - Session 数据存取比较频繁。内存访问速度快
+    - Session 有过期时间, Redis 这样的内存数据库能够比较方便实现过期释放
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661515652333-64a76e2d-ec08-4925-8421-60f8b830804e.png)
+
+- 优点:
+
+    - 访问速度比较快。虽然需要经过网络访问, 但是现在硬件条件已经能够达到网络访问比硬盘访问还要快
+
+        - 硬盘访问速度: 200M/s
+        - 网络访问速度: 1G/s
+
+    - Redis 可以配置主从复制集群, 不担心单点故障
+
+
+
+### 3.3 `SpringSession` 使用
+
+- 装饰模式
+- `SpringSession` 使得支持集群会话变得微不足道，而无需绑定到应用程序容器特定的解决方案
+- 以下文档针对在 `SpringBoot` 环境下使用
+- 实现跨项目存取 Session
+
+    - 独立项目测试使用
+    - `pro18-spring-session-a` 存
+
+        - 端口 8181
+
+    - `pro18-spring-session-b` 取
+
+        - 端口 8182
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661562452557-a4def515-53a9-4974-972d-387a2df677af.png)
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661562486613-e72c7a45-663f-4a40-b18c-3b56142e5b51.png)
+
+
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661562475253-0123cd9b-2e29-48d1-8f97-dc590cb7db6b.png)
+
+#### 3.3.1 共同代码
+
+##### 3.3.1.1 引入依赖
+
+```xml
+父引用 springboot
+<dependencies>
+  <dependency>  
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+  </dependency>
+  <!-- 引入 SpringBoot & Redis 场景 -->
+  <dependency>  
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-redis</artifactId>
+  </dependency>
+  <!-- 引入 SpringBoot & SpringSeesion 场景 -->
+  <dependency>  
+    <groupId>org.springframework.session</groupId>
+    <artifactId>spring-session-data-redis</artifactId>
+  </dependency>
+</dependencies>
+```
+
+
+
+##### 3.3.1.2 新建 `MainClass` 主启动类
+
+```java
+@SpringBootApplication
+public class MainClass {
+
+    public static void main(String[] args) {
+        SpringApplication.run(MainClass.class, args);
+    }
+
+}
+```
+
+
+
+##### 3.3.1.3 新建 `application.yml` 配置
+
+```yaml
+server:
+  port: 8181
+
+# Redis 配置
+spring:
+  redis:
+    host: 127.0.0.1
+
+# SpringSession 配置
+  session:
+    store-type: redis
+```
+
+- 注意: 存入 `Session` 域的实体类对象需要支持序列化
+
+
+
+#### 3.3.2 `pro18-spring-session-a`
+
+##### 3.3.2.1 新建 `HelloHandler` 类
+
+```java
+@RestController
+public class HelloHandler {
+    
+   @RequestMapping("/test/spring/session")
+   public String testSession(HttpSession session) {
+       session.setAttribute("king", "hello-king");
+       
+       return "数据存入 Session 域";
+   }
+   
+}
+```
+
+
+
+#### 3.3.3 `pro18-spring-session-b`
+
+##### 3.3.3.1 新建`HelloHandler`类
+
+```java
+@RestController
+public class HelloHandler {
+    
+   @RequestMapping("/test/spring/session/retrieve")
+   public String testSession(HttpSession session) {
+       String value = session.getAttribute("king");
+       
+       return value;
+   }
+   
+}
+```
+
+
+
+### 3.4 `SpringSession` 基本原理
+
+- 概况: `SpringSession` 从底层全方位"接管"了 `Tomcat` 对 `Session` 的管理
+
+#### 3.4.1 `SpringSession` 需要完成的任务
+
+- 包装 `Request` 对象
+- 找 `Session` 的时候访问 `Redis` 找
+- 找到包装以后得  `Session`
+- 传给 `Handler`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661562248532-8636c529-6b69-41e3-95c8-5622afa8431d.png)
+
+
+
+#### 3.4.2 `SessionRepositoryFilter`
+
+- 利用 Filter 原理, 在每次请求到达目标方法之前, 将原生 `HttpSeesionRequest`/`HttpServletResponse` 对象包装成为 `SessoinRepositoryRequest`/`ResponseWrapper`
+- 包装 `request` 对象时要做到: 包装后和包装前的**类型兼容**
+
+    - 所谓类型兼容: "包装得到的对象 `instanceof` 包装前类型" 返回 `true`
+
+- 只有做到了类型的兼容, 后面使用包装过的对象才能保持使用方法不变。
+
+    - 包装过的对象类型兼容、使用方法不变, 才能实现 "偷梁换柱"
+
+- 但是如果直接实现 `HttpServletRequest` 接口, 我们又知道如何实现各个抽象方法
+
+    - 这个问题可以借助原始被包装的对象来解决
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661563117912-1161408d-478c-4841-96f9-11fd6d9b33ff.png)
+
+
+
+## 4. 星图/架构图
+
+- 单一架构
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661567926586-fc92341c-87aa-4487-9c4e-c39f58c1c430.png)
+
+- 分布式架构
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661568221042-fe361def-4fa5-4e74-a848-e0e23ff48873.png)
+
+
+
+## 5. 登录检查
+
+- 把项目中必须登录才能访问的功能保护起来, 如果没有登录就访问则跳转到登录页面
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661569729881-d91ee6df-526d-4670-adff-0f4789518180.png)
+
+
+
+### 5.1 代码: 设置 `Session` 共享
+
+#### 5.1.1 `zuul、auth` 工程
+
+- 追加依赖
+
+```xml
+<!-- 引入 SpringBoot & Redis 场景 -->
+<dependency>  
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-data-redis</artifactId>
+</dependency>
+
+<!-- 引入 SpringBoot & SpringSession 场景 -->
+<dependency>  
+  <groupId>org.springframework.session</groupId>
+  <artifactId>spring-session-data-redis</artifactId>
+</dependency>
+```
+
+- 追加配置
+
+```yaml
+spring:
+  redis:
+    host: localhost
+  session:
+    store-type: redis
+```
+
+
+
+### 5.2 代码: 准备不需要登录检查的资源
+
+#### 5.2.1 新建 `AccessPassResources` 类
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661822425179-cc305e7e-eb17-4b6f-8e2f-7f898f653c69.png)
+
+```java
+package com.atguigu.crowd.constant;
+
+import java.util.HashSet;
+import java.util.Set;
+
+/**
+ * 特定请求地址和静态资源
+ *
+ * @author 陈江林
+ * @date 2022/8/30 09:19
+ */
+public class AccessPassResources {
+
+    public static final Set<String> PASS_RES_SET = new HashSet<>();
+
+    static {
+        PASS_RES_SET.add("/");
+        PASS_RES_SET.add("/auth/member/to/reg/page");
+        PASS_RES_SET.add("/auth/member/to/login/page");
+        PASS_RES_SET.add("/auth/member/logout");
+        PASS_RES_SET.add("/auth/member/do/login");
+        PASS_RES_SET.add("/auth/do/member/register");
+        PASS_RES_SET.add("/auth/member/send/short/message.json");
+    }
+
+    public static final Set<String> STATIC_RES_SET = new HashSet<>();
+
+    static {
+        STATIC_RES_SET.add("bootstrap");
+        STATIC_RES_SET.add("css");
+        STATIC_RES_SET.add("fonts");
+        STATIC_RES_SET.add("img");
+        STATIC_RES_SET.add("jquery");
+        STATIC_RES_SET.add("layer");
+        STATIC_RES_SET.add("script");
+        STATIC_RES_SET.add("ztree");
+    }
+
+    /**
+     * 用于判断某个 ServletPath 值是否对应一个静态资源
+     *
+     * @param servletPath
+     * @return true 是静态资源 false 不是静态资源
+     */
+    public static boolean judgeCurrentServletPathWetherStaticResource(String servletPath) {
+        // 1. 排除字符串无效的情况
+        if (servletPath == null || servletPath.length() == 0) {
+            throw new RuntimeException(CrowdConstant.MESSAGE_STRING_INVALIDATE);
+        }
+
+        // 2. 根据 "/" 拆分 ServletPath 字符串
+        String[] split = servletPath.split("/");
+
+        // 3. 考虑第一个斜杠左边经过拆分后得到有个空字符串是数组的第一个元素, 所以需要使用下标 1 取第二个元素
+        String firstLevelPath = split[1];
+
+        // 4. 判断是否在这个集合中
+        return STATIC_RES_SET.contains(firstLevelPath);
+    }
+
+    public static void main(String[] args) {
+        String servletPath = "/css/aaa/ccc";
+        boolean result = judgeCurrentServletPathWetherStaticResource(servletPath);
+        System.out.println(result);
+    }
+
+}
+```
+
+
+
+### 5.3 代码: `zuul` 工程
+
+- (已配置) 配置 `zuul.sensitive-headers: "*" `# 在 zuul 向其他微服务重定向时保持原本的头信息（请求头、响应头）
+
+
+
+#### 5.3.1 新建 `CrowdAccessFilter` 类
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661823427261-a52e6cab-3061-489f-9c37-0350a4692914.png)
+
+```java
+package com.atguigu.crowd.filter;
+
+import com.atguigu.crowd.constant.AccessPassResources;
+import com.atguigu.crowd.constant.CrowdConstant;
+import com.netflix.zuul.ZuulFilter;
+import com.netflix.zuul.context.RequestContext;
+import com.netflix.zuul.exception.ZuulException;
+import org.springframework.stereotype.Component;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import java.io.IOException;
+
+/**
+ * @author 陈江林
+ * @date 2022/8/30 09:24
+ */
+@Component
+public class CrowdAccessFilter extends ZuulFilter {
+
+    @Override
+    public boolean shouldFilter() {
+        // 1. 获取 RequestContext 对象
+        RequestContext requestContext = RequestContext.getCurrentContext();
+
+        // 2. 通过 RequestContext 对象获取当前请求对象
+        //（框架底层是借助 ThreadLocal 从当前线程上获取事先绑定的 Request 对象）
+        HttpServletRequest request = requestContext.getRequest();
+
+        // 3. 获取 ServletPath
+        String servletPath = request.getServletPath();
+
+        // 4. 根据 servletPath 判断当前请求是否对应可以直接放行的特定请求
+        boolean containsResult = AccessPassResources.PASS_RES_SET.contains(servletPath);
+        if (containsResult) {
+            // 如果当前请求是可以直接放行的特定功能请求则返回 false 放行
+            return false;
+        }
+
+        // 判断当前请求是否为静态资源
+        // 工具方法返回 true: 说明当前请求是静态资源请求, 取反为 false（表示放行不做登录检查）
+        // 工具方法返回 false: 表示当前请求表示可以放行的特定请求也不是静态资源, 取反为 true（表示需要做登录检查）
+        return !AccessPassResources.judgeCurrentServletPathWetherStaticResource(servletPath);
+    }
+
+    /**
+     * 登录检查
+     *
+     * @return
+     * @throws ZuulException
+     */
+    @Override
+    public Object run() throws ZuulException {
+        // 1. 获取当前请求对象
+        RequestContext requestContext = RequestContext.getCurrentContext();
+        HttpServletRequest request = requestContext.getRequest();
+
+        // 2. 获取当前 Session 对象
+        HttpSession session = request.getSession();
+
+        // 3. 尝试从 Session 对象中获取已登录的用户
+        Object loginMember = session.getAttribute(CrowdConstant.ATTR_NAME_LOGIN_MEMBER);
+
+        // 4. 判断 loginMember 是否为空
+        if (loginMember == null) {
+            // 5. 未登录状态, 跳转至登录页面
+            // 从 requestContext 对象中获取 Response 对象
+            HttpServletResponse response = requestContext.getResponse();
+
+            // 6. 将提示消息存入 Session 域
+            session.setAttribute(CrowdConstant.ATTR_NAME_MESSAGE, CrowdConstant.MESSAGE_ACCESS_FORBIDEN);
+
+            // 7. 重定向到 auth 工程中的登录页面
+            try {
+                response.sendRedirect("/auth/member/to/login/page");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return null;
+    }
+
+    @Override
+    public String filterType() {
+        // 这里返回 pre 意思是在目标微服务前执行过滤
+        return "pre";
+    }
+
+    @Override
+    public int filterOrder() {
+        return 0;
+    }
+
+}
+```
+
+
+
+#### 5.3.2 追加依赖
+
+```xml
+<!-- 为了能够使用工具类 -->
+<dependency>
+    <groupId>com.atguigu.crowd</groupId>
+    <artifactId>atcrowdfunding05-common-util</artifactId>
+    <version>1.0-SNAPSHOT</version>
+</dependency>
+
+<!-- 为能够使用实体类 -->
+<dependency>
+    <groupId>com.atguigu.crowd</groupId>
+    <artifactId>atcrowdfunding09-member-entity</artifactId>
+    <version>1.0-SNAPSHOT</version>
+</dependency>
+```
+
+
+
+### 5.4 `auth` 工程
+
+#### 5.4.1 追加代码 `member-login.html`
+
+```html
+<p th:text="${session.message}">这里显示的是登录检查后发现不允许访问时的提示消息</p>
+```
+
+
+
+## 6 修改重定向地址, 使用 `zuul`
+
+### 6.1 因为 `Cookie` 问题不能使用重定向跨项目跳转, 所以集中访问 `zuul` 来进行重定向
+
+- 描述问题: `http://localhost:4000` 和 `http://localhost:80` 是两个不同的网站, 浏览器工作时不会使用相同 `Cookie`
+- 解决: 重定向的地址都按照通过 `Zuul` 访问的方式写地址
+
+
+
+1. 追加代码 `CrowdConstant` 存储地址 【`common` 工程】
+
+```java
+public static final String ZUUL_PATH_VALUE = "http://localhost";
+```
+
+1. 修改 `redirect` 代码 `MemberHandler`【`auth` 工程】
+
+```java
+package com.atguigu.crowd.handler;
+
+import com.atguigu.crowd.api.MySQLRemoteService;
+import com.atguigu.crowd.api.RedisRemoteService;
+import com.atguigu.crowd.config.ShortMessageProperties;
+import com.atguigu.crowd.constant.CrowdConstant;
+import com.atguigu.crowd.entity.po.MemberPO;
+import com.atguigu.crowd.entity.vo.MemberLoginVO;
+import com.atguigu.crowd.entity.vo.MemberVO;
+import com.atguigu.crowd.util.CrowdUtil;
+import com.atguigu.crowd.util.ResultEntity;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import javax.servlet.http.HttpSession;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * @author 陈江林
+ * @date 2022/8/29 11:21
+ */
+@Controller
+public class MemberHandler {
+
+    @Autowired
+    private ShortMessageProperties shortMessageProperties;
+
+    @Autowired
+    private RedisRemoteService redisRemoteService;
+
+    @Autowired
+    private MySQLRemoteService mySQLRemoteService;
+
+    /**
+     * 退出登录
+     *
+     * @param session
+     * @return
+     */
+    @RequestMapping("/auth/member/logout")
+    public String logout(HttpSession session) {
+
+        session.invalidate();
+
+        return "redirect:" + CrowdConstant.ZUUL_PATH_VALUE + "/";
+    }
+
+    /**
+     * 会员登录
+     *
+     * @param loginacct 账户
+     * @param userpswd  密码
+     * @param modelMap
+     * @param session
+     * @return
+     */
+    @RequestMapping("/auth/member/do/login")
+    public String doLogin(
+            @RequestParam("loginacct") String loginacct,
+            @RequestParam("userpswd") String userpswd,
+            ModelMap modelMap,
+            HttpSession session) {
+        ResultEntity<MemberPO> resultEntity = mySQLRemoteService.getMemberPOByLoginAcctRemote(loginacct);
+        if (ResultEntity.FAILED.equals(resultEntity.getResult())) {
+            modelMap.addAttribute(CrowdConstant.ATTR_NAME_MESSAGE, resultEntity.getMessage());
+            return "member-login";
+        }
+
+        MemberPO memberPO = resultEntity.getData();
+        if (memberPO == null) {
+            modelMap.addAttribute(CrowdConstant.ATTR_NAME_MESSAGE, CrowdConstant.MESSAGE_LOGIN_FAILED);
+            return "member-login";
+        }
+
+        // 2. 比较密码
+        String userpswdDataBase = memberPO.getUserpswd();
+
+        BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
+        bCryptPasswordEncoder.matches(userpswd, userpswdDataBase);
+
+        // 3. 创建 MemberLoginVO 对象传入 Session 域
+        MemberLoginVO memberLoginVO = new MemberLoginVO(memberPO.getId(), memberPO.getUsername(), memberPO.getEmail());
+        // ATTR_NAME_LOGIN_MEMBER = loginMember
+        session.setAttribute(CrowdConstant.ATTR_NAME_LOGIN_MEMBER, memberLoginVO);
+
+        return "redirect:" + CrowdConstant.ZUUL_PATH_VALUE + "/auth/member/to/conter/page";
+    }
+
+    /**
+     * 执行注册
+     *
+     * @param memberVO
+     * @param modelMape
+     * @return
+     */
+    @RequestMapping("/auth/do/member/register")
+    public String register(MemberVO memberVO, ModelMap modelMape) {
+        // 1. 获取用户输入的手机号码
+        String phoneNum = memberVO.getPhoneNum();
+
+        // 2. 拼 Redis 中存储验证码的 Key
+        String key = CrowdConstant.REDIS_CODE_PREFIX + phoneNum;
+
+        // 3. 从 Redis 读取 Key 对应的 Value
+        ResultEntity<String> resultEntity = redisRemoteService.getRedisKeyValueByKey(key);
+
+        // 4. 检查查询操作是否有效
+        String result = resultEntity.getResult();
+        if (ResultEntity.FAILED.equals(result)) {
+            modelMape.addAttribute(CrowdConstant.ATTR_NAME_MESSAGE, resultEntity.getMessage());
+            return "member-reg";
+        }
+
+        String redisCode = resultEntity.getData();
+
+        if (redisCode == null) {
+            // MESSAGE_CODE_NOT_EXISTS = 验证码已过期!请检查手机号码是否正确或重新发送!
+            modelMape.addAttribute(CrowdConstant.ATTR_NAME_MESSAGE, CrowdConstant.MESSAGE_CODE_NOT_EXISTS);
+            return "member-reg";
+        }
+
+        // 5. 如果从 Redis 能够查询到 Value 则比较表单的验证码和 Redis 的验证码
+        String formCode = memberVO.getCode();
+
+        if (!Objects.equals(formCode, redisCode)) {
+            // MESSAGE_CODE_INVALID = 验证码不正确!
+            modelMape.addAttribute(CrowdConstant.ATTR_NAME_MESSAGE, CrowdConstant.MESSAGE_CODE_INVALID);
+            return "member-reg";
+        }
+
+        // 6. 如果验证码一致则从 Redis 删除
+        redisRemoteService.removeRedisKeyRemote(key);
+
+        // 7. 执行密码加密
+        BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
+        String userpswdBeforeEncode = memberVO.getUserpswd();
+        String userpswdAfterEncode = bCryptPasswordEncoder.encode(userpswdBeforeEncode);
+
+        memberVO.setUserpswd(userpswdAfterEncode);
+        // 8. 执行保存
+        // 8.1 创建空的 memberPO 对象
+        MemberPO memberPO = new MemberPO();
+
+        // 8.2 复制属性
+        BeanUtils.copyProperties(memberVO, memberPO);
+
+        // 8.3 调用远程的方法
+        ResultEntity<String> saveMemberResultEntity = mySQLRemoteService.saveMember(memberPO);
+        if (ResultEntity.FAILED.equals(saveMemberResultEntity.getResult())) {
+            modelMape.addAttribute(CrowdConstant.ATTR_NAME_MESSAGE, saveMemberResultEntity.getMessage());
+            return "member-reg";
+        }
+
+        // 使用重定向避免刷新浏览器导致重新执行注册流程
+        return "redirect:" + CrowdConstant.ZUUL_PATH_VALUE + "/auth/member/to/login/page";
+    }
+
+    /**
+     * 发送短信验证码
+     *
+     * @param phoneNum 手机号码
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping("/auth/member/send/short/message.json")
+    public ResultEntity<String> sendMessage(
+            @RequestParam("phoneNum") String phoneNum) {
+        try {
+            // 1. 发送验证码
+            ResultEntity<String> sendMessageResultEntity = CrowdUtil.sendShortMessage(
+                    shortMessageProperties.getAppCode(),
+                    shortMessageProperties.getTemplateId(),
+                    shortMessageProperties.getHost(),
+                    shortMessageProperties.getPath(),
+                    shortMessageProperties.getMethod(),
+                    phoneNum
+            );
+
+            // 2. 判断发送结果
+            if (ResultEntity.SUCCESS.equals(sendMessageResultEntity.getResult())) {
+                // 3. 成功: 将验证码存入 Redis
+                String code = sendMessageResultEntity.getData();
+                String key = CrowdConstant.REDIS_CODE_PREFIX + phoneNum;
+                ResultEntity<String> saveCodeResultEntity = redisRemoteService.setRedisKeyValueRemoteWithTimeout(key, code, 15, TimeUnit.MINUTES);
+                if (ResultEntity.SUCCESS.equals(saveCodeResultEntity.getResult())) {
+                    return ResultEntity.successWithoutData();
+                } else {
+                    return saveCodeResultEntity;
+                }
+            } else {
+                return sendMessageResultEntity;
+            }
+        } catch (Exception e) {
+            return ResultEntity.failed(e.getMessage());
+        }
+    }
+}
+```
+
+
+
+### 6.2 前端重定向地址, 使用 Session 共享存储 `zuul` 地址解决
+
+#### 6.2.1 项目启动自动存储 `zuul` 地址
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661859079702-404e4150-be6c-49cb-bef0-8f5b1ddbd4f0.png)
+
+```java
+package com.atguigu.crowd.filter;
+
+import com.atguigu.crowd.constant.AccessPassResources;
+import com.atguigu.crowd.constant.CrowdConstant;
+import com.netflix.zuul.ZuulFilter;
+import com.netflix.zuul.context.RequestContext;
+import com.netflix.zuul.exception.ZuulException;
+import org.springframework.stereotype.Component;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import java.io.IOException;
+
+/**
+ * @author 陈江林
+ * @date 2022/8/30 09:24
+ */
+@Component
+public class CrowdAccessFilter extends ZuulFilter {
+
+    @Override
+    public boolean shouldFilter() {
+        // 1. 获取 RequestContext 对象
+        RequestContext requestContext = RequestContext.getCurrentContext();
+
+        // 2. 通过 RequestContext 对象获取当前请求对象
+        //（框架底层是借助 ThreadLocal 从当前线程上获取事先绑定的 Request 对象）
+        HttpServletRequest request = requestContext.getRequest();
+
+        setSessionValue(request.getSession());
+
+        // 3. 获取 ServletPath
+        String servletPath = request.getServletPath();
+
+        // 4. 根据 servletPath 判断当前请求是否对应可以直接放行的特定请求
+        boolean containsResult = AccessPassResources.PASS_RES_SET.contains(servletPath);
+        if (containsResult) {
+            // 如果当前请求是可以直接放行的特定功能请求则返回 false 放行
+            return false;
+        }
+
+        // 判断当前请求是否为静态资源
+        // 工具方法返回 true: 说明当前请求是静态资源请求, 取反为 false（表示放行不做登录检查）
+        // 工具方法返回 false: 表示当前请求表示可以放行的特定请求也不是静态资源, 取反为 true（表示需要做登录检查）
+        return !AccessPassResources.judgeCurrentServletPathWetherStaticResource(servletPath);
+    }
+
+    /**
+     * 存储 zuul 地址
+     *
+     * @param session
+     */
+    public void setSessionValue(HttpSession session) {
+        if (!CrowdConstant.ZUUL_PATH_VALUE.equals(session.getAttribute(CrowdConstant.ZUUL_PATH_KEY))) {
+            session.setAttribute(CrowdConstant.ZUUL_PATH_KEY, CrowdConstant.ZUUL_PATH_VALUE);
+        }
+    }
+
+    /**
+     * 登录检查
+     *
+     * @return
+     * @throws ZuulException
+     */
+    @Override
+    public Object run() throws ZuulException {
+        // 1. 获取当前请求对象
+        RequestContext requestContext = RequestContext.getCurrentContext();
+        HttpServletRequest request = requestContext.getRequest();
+
+        // 2. 获取当前 Session 对象
+        HttpSession session = request.getSession();
+
+        // 3. 尝试从 Session 对象中获取已登录的用户
+        Object loginMember = session.getAttribute(CrowdConstant.ATTR_NAME_LOGIN_MEMBER);
+
+        // 4. 判断 loginMember 是否为空
+        if (loginMember == null) {
+            // 5. 未登录状态, 跳转至登录页面
+            // 从 requestContext 对象中获取 Response 对象
+            HttpServletResponse response = requestContext.getResponse();
+
+            // 6. 将提示消息存入 Session 域
+            session.setAttribute(CrowdConstant.ATTR_NAME_MESSAGE, CrowdConstant.MESSAGE_ACCESS_FORBIDEN);
+
+            // 7. 重定向到 auth 工程中的登录页面
+            try {
+                response.sendRedirect("/auth/member/to/login/page");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return null;
+    }
+
+    @Override
+    public String filterType() {
+        // 这里返回 pre 意思是在目标微服务前执行过滤
+        return "pre";
+    }
+
+    @Override
+    public int filterOrder() {
+        return 0;
+    }
+
+}
+```
+
+
+
+
+
+#### 6.2.2 追加代码 `CrowdConstant` 【`common`工程】
+
+```java
+public static final String ZUUL_PATH_KEY = "zuulPath";
+public static final String ZUUL_PATH_VALUE = "http://localhost";
+```
+
+
+
+#### 6.2.3 前端重定向可以使用 `${session.zuulPath}`获取地址
+

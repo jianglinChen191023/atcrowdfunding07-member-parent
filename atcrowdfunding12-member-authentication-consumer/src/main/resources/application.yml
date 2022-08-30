@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: atguigu-crowd-auth
+  session:
+    store-type: redis
 
 eureka:
   client:
