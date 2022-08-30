@@ -16,10 +16,10 @@ public interface MySQLRemoteService {
     /**
      * 根据账号查询
      *
-     * @param loginacc 账号
+     * @param loginacct 账号
      * @return
      */
     @RequestMapping("/get/memberpo/login/acct/remote")
-    ResultEntity<MemberPO> getMemberPOByLoginAcctRemote(@RequestParam("loginacc") String loginacc);
+    ResultEntity<MemberPO> getMemberPOByLoginAcctRemote(@RequestParam("loginacct") String loginacct);
 
 }

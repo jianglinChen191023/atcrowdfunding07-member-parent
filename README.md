@@ -504,6 +504,40 @@ eureka:
 
 ![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660866025697-5e59e7d5-494c-4865-901d-073d7e47b115.png)
 
+- 创建数据库表
+
+```plsql
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-  ----------------------------
+-- Table structure for t_member
+-  ----------------------------
+DROP TABLE IF EXISTS `t_member`;
+CREATE TABLE `t_member` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `loginacct` varchar(255) NOT NULL,
+  `userpswd` varchar(255) NOT NULL,
+  `username` varchar(255) DEFAULT NULL,
+  `email` varchar(255) DEFAULT NULL,
+  `authstatus` int(4) DEFAULT NULL COMMENT '实名认证状态 [{0: 未实名认证}, {1: 实名认证申请中}, {2: 已实名认证}]',
+  `usertype` int(4) DEFAULT NULL COMMENT '[{0: 个人}, {1: 企业}]',
+  `realname` varchar(255) DEFAULT NULL COMMENT '真实姓名',
+  `cardnum` varchar(255) DEFAULT NULL COMMENT '卡号',
+  `accttype` int(4) DEFAULT NULL COMMENT '[{0: 企业}, {1: 个体}, {2: 个人}, {3: 政府}]',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `t_member_pk` (`loginacct`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+-  ----------------------------
+-- Records of t_member
+-  ----------------------------
+BEGIN;
+COMMIT;
+
+SET FOREIGN_KEY_CHECKS = 1;
+```
+
 ------
 
 ### 5.1 依赖
@@ -2043,11 +2077,11 @@ public interface MySQLRemoteService {
     /**
      * 根据账号查询
      * 
-     * @param loginacc 账号
+     * @param loginacct 账号
      * @return
      */
     @RequestMapping("/get/memberpo/login/acct/remote")
-    ResultEntity<MemberPO> getMemberPOByLoginAcctRemote(@RequestParam("loginacc") String loginacc);
+    ResultEntity<MemberPO> getMemberPOByLoginAcctRemote(@RequestParam("loginacct") String loginacct);
 
 }
 ```
@@ -3654,29 +3688,29 @@ public class PortalHandler {
         <groupId>org.springframework.cloud</groupId>
         <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
     </dependency>
-
+    
     <!-- 整合 Zuul 网关 -->
-    <dependency>
-        <groupId>org.springframework.cloud</groupId>
-        <artifactId>spring-cloud-starter-netflix-zuul</artifactId>
-    </dependency>
+  	<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-netflix-zuul</artifactId>
+		</dependency>
 </dependencies>
 
 <build>
-<plugins>
-    <!-- 这个插件将 SpringBoot 应用打包成一个可执行的 jar 包 -->
-    <plugin>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-maven-plugin</artifactId>
-        <executions>
-            <execution>
-                <goals>
-                    <goal>repackage</goal>
-                </goals>
-            </execution>
-        </executions>
-    </plugin>
-</plugins>
+    <plugins>
+        <!-- 这个插件将 SpringBoot 应用打包成一个可执行的 jar 包 -->
+        <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+            <executions>
+                <execution>
+                    <goals>
+                        <goal>repackage</goal>
+                    </goals>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
 </build>
 ```
 
@@ -3693,7 +3727,7 @@ import org.springframework.cloud.netflix.zuul.EnableZuulProxy;
 
 /**
  * `@EnableZuulProxy` 启动 zuul 代理功能
- *
+ * 
  * @author 陈江林
  * @date 2022/8/28 22:26
  */
