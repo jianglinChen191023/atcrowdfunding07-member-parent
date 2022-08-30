@@ -150,6 +150,36 @@
             - [6.2.2 追加代码 `CrowdConstant` 【`common`工程】](#622-追加代码-crowdconstant-common工程)
             - [6.2.3 前端重定向可以使用 `${session.zuulPath}`获取地址](#623-前端重定向可以使用-sessionzuulpath获取地址)
 
+- [十九 OSS](#十九-oss)
+    - [1. 阿里云的 OSS 对象存储](#1-阿里云的-oss-对象存储)
+        - [1.1 提出问题](#11-提出问题)
+            - [1.1.1 以前上传文件时保持位置](#111-以前上传文件时保持位置)
+            - [1.1.2 问题1: Web 应用重新部署导致文件丢失](#112-问题1-web-应用重新部署导致文件丢失)
+            - [1.1.3 问题2: 集群环境下文件难以同步](#113-问题2-集群环境下文件难以同步)
+            - [1.1.4 问题3: Tomcat 被拖垮](#114-问题3-tomcat-被拖垮)
+            - [1.1.5 问题4: 服务器存储自动扩容问题](#115-问题4-服务器存储自动扩容问题)
+        - [1.2 解决方案介绍](#12-解决方案介绍)
+            - [1.2.1 自己搭建文件服务器](#121-自己搭建文件服务器)
+            - [1.2.2 使用第三方云服务](#122-使用第三方云服务)
+        - [1.3 开通 OSS 服务步骤](#13-开通-oss-服务步骤)
+        - [1.4 使用 `OSS`](#14-使用-oss)
+        - [1.5 Java 程序调用 OSS 服务接口](#15-java-程序调用-oss-服务接口)
+            - [1.5.1 参考文档地址](#151-参考文档地址)
+            - [1.5.2 官网介绍](#152-官网介绍)
+            - [1.5.3 创建访问秘钥 `AccessKey`](#153-创建访问秘钥-accesskey)
+            - [1.5.4 创建子账号 `AK` 的操作](#154-创建子账号-ak-的操作)
+            - [1.5.5 OSS 依赖](#155-oss-依赖)
+        - [1.6 将 `OSS` 引入 `project` 项目](#16-将-oss-引入-project-项目)
+            - [1.6.1 `config` 包: `OSSProperties`](#161-config-包-ossproperties)
+            - [1.6.2 依赖](#162-依赖)
+            - [1.6.3 新建 `CrowdMainClass`主启动类](#163-新建-crowdmainclass主启动类)
+            - [1.6.4 新建 `application.yml` 配置](#164-新建-applicationyml-配置)
+        - [1.7 `common` 工程](#17-common-工程)
+            - [1.7.1 追加依赖](#171-追加依赖)
+            - [1.7.2 工具类 `CrowdUtil` 中追加方法](#172-工具类-crowdutil-中追加方法)
+            - [1.7.3 测试 OSS](#173-测试-oss)
+            - [1.7.4 如果报错: `Error: A JNI error has occurred, please check your installation and try agai`](#174-如果报错-error-a-jni-error-has-occurred-please-check-your-installation-and-try-agai)
+
 
 # 十六 会员系统-搭建环境
 
@@ -6391,3 +6421,496 @@ public static final String ZUUL_PATH_VALUE = "http://localhost";
 
 #### 6.2.3 前端重定向可以使用 `${session.zuulPath}`获取地址
 
+
+
+# 十九 OSS
+
+```
+git checkout -b 19.0.0_oss
+```
+
+## 1. 阿里云的 OSS 对象存储
+
+### 1.1 提出问题
+
+#### 1.1.1 以前上传文件时保持位置
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661590226415-d1c0ea66-801e-4043-bd1e-0501ea065afe.png)
+
+
+
+#### 1.1.2 问题1: Web 应用重新部署导致文件丢失
+
+- 重新部署 Web 应用时, 卸载（删除）旧的 Web 应用, 连同用户上传的文件一起删除, 重新加载新的 Web 应用后, 以前用户上传的文件不会自动回复
+- 危害总结: Web 应用重新部署会导致用户上传的文件丢失
+
+
+
+#### 1.1.3 问题2: 集群环境下文件难以同步
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661590410265-6af2bd84-cab7-4565-837f-1268f7d5bf9a.png)
+
+
+
+#### 1.1.4 问题3: Tomcat 被拖垮
+
+- 用户上传的文件如果数据量膨胀到了一个非常庞大的体积, 那么就会严重影响 Tomcat 的运行效率
+
+
+
+#### 1.1.5 问题4: 服务器存储自动扩容问题
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661591010244-37666a6d-9100-4b25-b6b5-f6d5f9dd3fc8.png)
+
+- 危害总结: 手动对服务器进行扩容, 有可能导致项目中其他地方需要连带修改
+
+
+
+### 1.2 解决方案介绍
+
+#### 1.2.1 自己搭建文件服务器
+
+- 举例: `FastDFS`
+- 好处: 服务器可以自己维护、自己定制
+- 缺点: 需要投入的人力、物力更多
+- 适用: 规模比较大的项目, 要存储海量的文件
+
+
+
+#### 1.2.2 使用第三方云服务
+
+- 举例: 阿里云提供的 `OSS` 对象存储服务
+- 好处: 不必自己维护服务器的软硬件资源。直接调用相关 `API` 即可操作, 更加轻量级
+- 缺点: 数据不在自己手里。服务器不由自己维护
+- 适用: 较小规模的应用, 文件数据不是绝对私密
+
+
+
+### 1.3 开通 OSS 服务步骤
+
+1. 注册阿里云账号
+2. 完成实名认证
+3. 找到 `对象存储 OSS`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661596511496-e7985f9e-38ec-499f-ab9f-c4a09da821b8.png)
+
+
+
+1. 点击 **立即开通**
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661596572303-c6b1afc4-a2dd-428e-8f9f-5f027f68f002.png)
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661596616072-e966a9e4-5b95-4d43-adc0-3989cfc25ec2.png)
+
+
+
+### 1.4 使用 `OSS`
+
+1. 打开 `OSS` 控制台
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661596723883-30eb12f7-d758-4ecb-984c-84a868556f91.png)
+
+
+
+1. 创建 `Bucket`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661597404537-0acfe3e8-8f9c-4024-8338-e6acf773b181.png)
+
+
+
+1. 新建目录
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661597690537-70d6688d-f123-4305-8ebb-6870dc1bf86c.png)
+
+
+
+1. 上传文件
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661598175618-19b59af3-1782-4a95-9c09-3ed37267851f.png)
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661598344400-9f6df9d0-35ef-4627-be47-1ee4d1699bb2.png)
+
+
+
+1. 路径组成 `https://域名/图片路径`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661598451082-5eb9ba28-8ceb-47a1-9f3f-5f8b0ec257df.png)
+
+
+
+
+
+### 1.5 Java 程序调用 OSS 服务接口
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661598711691-84e9b057-5c13-4342-b64d-ea3449e9682e.png)
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661601017330-abbff1f9-cef8-4cf2-802f-d14e248e77f0.png)
+
+#### 1.5.1 参考文档地址
+
+https://help.aliyun.com/product/31815.html
+
+
+
+#### 1.5.2 官网介绍
+
+阿里云对象存储OSS（Object Storage Service）是一款海量、安全、低成本、高可靠的云存储服务，可提供99.9999999999%（12个9）的数据持久性，99.995%的数据可用性。多种存储类型供选择，全面优化存储成本。
+
+
+
+#### 1.5.3 创建访问秘钥 `AccessKey`
+
+- `AccessKey` -> `Java` 程序登录 `OSS` 进行操作
+- 访问秘钥 `AccessKey（AK）`用于程序方式调用云服务 `API`
+- 可以使用 `AccessKey` 构造一个 API 请求（或者使用云服务 SDK）来操作资源
+- `AccessKey` 包括 `AccessKeyId` 和 `AccessKeySecret`
+- 警告: 禁止使用主账号 `AK`,  因为主账号 `AK` 泄露会威胁您所有资源的安全。请使用子账号（`RAM` 用户）`AK` 进行登录, 可有效降低 `AK` 泄露的风险
+
+
+
+#### 1.5.4 创建子账号 `AK` 的操作
+
+1. 使用主账号登录 `RAM` 管理控制台
+2. 如果未创建 `RAM` 用户, 在**左侧导航栏**, 搜索**访问控制**
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661599826708-19abe8c3-cc77-48cc-ae26-7babcba2feda.png)
+
+
+
+1. 然后点击**用户**, **创建用户**
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661599947651-64ee55fd-c990-45a2-a771-3458339e7d04.png)
+
+此处为语雀加密文本卡片，点击链接查看：https://www.yuque.com/lingchen-bf1rc/hoahc6/mrsgsa#lI0qc
+
+
+
+1. 配置权限 `AliyunOSSFullAccess`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661600659680-8cb94a47-66d1-4e8d-ae6f-d2b119cf99a9.png)
+
+
+
+#### 1.5.5 OSS 依赖
+
+```xml
+<!-- OSS Java SDK -->
+<dependency>
+    <groupId>com.aliyun.oss</groupId>
+    <artifactId>aliyun-sdk-oss</artifactId>
+    <version>3.5.0</version>
+</dependency>
+```
+
+
+
+### 1.6 将 `OSS` 引入 `project` 项目
+
+#### 1.6.1 `config` 包: `OSSProperties`
+
+```java
+package com.atguigu.crowd.config;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
+
+/**
+ * @author 陈江林
+ * @date 2022/8/30 20:09
+ */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Component
+@ConfigurationProperties(prefix = "aliyun.oss")
+public class OSSProperties {
+
+    /**
+     * Bucket 名称
+     */
+    private String bucketName;
+
+    /**
+     * 地域节点
+     */
+    private String endPoint;
+
+    /**
+     * Bucket 域名
+     */
+    private String bucketDomain;
+
+    /**
+     * 访问标识
+     */
+    private String accessKeyId;
+
+    /**
+     * 访问秘钥
+     */
+    private String accessKeySecret;
+
+}
+```
+
+
+
+#### 1.6.2 依赖
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>com.atguigu.crowd</groupId>
+        <artifactId>atcrowdfunding17-member-api</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </dependency>
+
+    <!-- 导入配置文件处理器, 配置文件进行绑定 -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-configuration-processor</artifactId>
+        <optional>true</optional>
+    </dependency>
+
+    <!-- 对外暴露服务 -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <!-- 整合视图 -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-thymeleaf</artifactId>
+    </dependency>
+
+    <!-- 作为客户端访问 Eureka 注册中心 -->
+    <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+    </dependency>
+
+    <!-- SpringBoot 测试 -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-test</artifactId>
+        <scope>test</scope>
+    </dependency>
+
+    <!-- 引入 SpringBoot & Redis 场景 -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-data-redis</artifactId>
+    </dependency>
+
+    <!-- 引入 SpringBoot & SpringSession 场景 -->
+    <dependency>
+        <groupId>org.springframework.session</groupId>
+        <artifactId>spring-session-data-redis</artifactId>
+    </dependency>
+</dependencies>
+
+<build>
+    <plugins>
+        <!-- 这个插件将 SpringBoot 应用打包成一个可执行的 jar 包 -->
+        <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+            <executions>
+                <execution>
+                    <goals>
+                        <goal>repackage</goal>
+                    </goals>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
+</build>
+```
+
+
+
+#### 1.6.3 新建 `CrowdMainClass`主启动类
+
+```java
+package com.atguigu.crowd;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.openfeign.EnableFeignClients;
+
+/**
+ * @author 陈江林
+ * @date 2022/8/30 23:09
+ */
+@EnableFeignClients
+@SpringBootApplication
+public class CrowdMainClass {
+
+    public static void main(String[] args) {
+        SpringApplication.run(CrowdMainClass.class, args);
+    }
+
+}
+```
+
+
+
+#### 1.6.4 新建 `application.yml` 配置
+
+```yaml
+server:
+  port: 5000
+
+spring:
+  application:
+    name: atguigu-crowd-project
+  session:
+    store-type: redis
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:1000/eureka
+
+ribbon:
+  # 10秒 - 处理请求的超时时间，默认为5秒
+  ReadTimeout: 10000
+  # 10秒 - 连接建立的超时时长，默认5秒
+  ConnectTimeout: 10000
+
+# 阿里云 oss 对象存储
+aliyun:
+  oss:
+    bucket-name: atguigu220827
+    end-point: oss-cn-guangzhou.aliyuncs.com
+    bucket-domain: atguigu220827.oss-cn-guangzhou.aliyuncs.com
+    access-key-id: LTAI5t5vpW9Fcqk8qBW7nvcV
+    access-key-secret: fWxGZing02E6uZKE4NNV9W8RrzjjCT
+```
+
+
+
+### 1.7 `common` 工程
+
+#### 1.7.1 追加依赖
+
+```xml
+<!-- OSS Java SDK -->
+<dependency>
+    <groupId>com.aliyun.oss</groupId>
+    <artifactId>aliyun-sdk-oss</artifactId>
+    <version>3.5.0</version>
+</dependency>
+```
+
+
+
+#### 1.7.2 工具类 `CrowdUtil` 中追加方法
+
+```java
+/**
+     * 专门负责上传文件到 OSS 服务器的工具方法
+     *
+     * @param bucketName
+     * @param endpoint
+     * @param bucketDomain
+     * @param accessKeyId
+     * @param accessKeySecret
+     * @param inputStream     要上传文件的输入流
+     * @param originalName    要上传文件的原始文件名
+     * @return
+     */
+    public static ResultEntity<String> uploadFilterOss(
+            String bucketName,
+            String endpoint,
+            String bucketDomain,
+            String accessKeyId,
+            String accessKeySecret,
+            InputStream inputStream,
+            String originalName) {
+        // 创建 OSSClient 实例
+        OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
+
+        // 生成生成文件的目录
+        String folderName = new SimpleDateFormat("yyyyMMdd").format(new Date());
+
+        // 生成生成文件在 OSS 服务器上保存时的文件名
+        // 原始文件名: beaufulgirl.jpg
+        // 生成文件名: wer234234efwer235346457dfswet346235.jpg
+        // 使用 UUID 生成文件主体名称
+        String fileMainName = UUID.randomUUID().toString().replace("_", "");
+
+        // 从原始文件名中获取文件扩展名
+        String extensionName = originalName.substring(originalName.lastIndexOf("."));
+
+        // 使用目录、文件主体名称、文件扩展名称拼接得到对象名称
+        String objectName = folderName + "/" + fileMainName + extensionName;
+
+        try {
+            // 调用 OSS 客户端对象的方法生成文件并获取响应结果数据
+            // 上传文件
+            PutObjectResult putObjectResult = ossClient.putObject(bucketName, objectName, inputStream);
+
+            // 从响应结果中获取具体响应消息
+            ResponseMessage responseMessage = putObjectResult.getResponse();
+
+            // 根据响应状态码判断请求是否成功
+            if (responseMessage == null) {
+                // 成功
+                // 拼接访问刚刚上传的文件路径
+                String ossFileAccessPath = bucketDomain + "/" + objectName;
+
+                return ResultEntity.successWithData(ossFileAccessPath);
+            } else {
+                // 获取响应状态码
+                int staticCode = responseMessage.getStatusCode();
+
+                // 如果请求没有成功, 获取错误消息
+                String errorMessage = responseMessage.getErrorResponseAsString();
+
+                // 当前方法返回失败
+                return ResultEntity.failed("当前响应状态码: " + staticCode + "错误消息: " + errorMessage);
+            }
+        } catch (Exception e) {
+            return ResultEntity.failed(e.getMessage());
+        } finally {
+            if (ossClient != null) {
+                ossClient.shutdown();
+            }
+        }
+    }
+```
+
+
+
+#### 1.7.3 测试 OSS
+
+```java
+public static void main(String[] args) throws FileNotFoundException {
+    FileInputStream inputStream = new FileInputStream("/Users/chenjianglin/Desktop/333.jpg");
+    // ResultEntity{result='SUCCESS', message='null', data=atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220830/837093df-ee43-4370-8c44-48180fcb59eb.jpg}
+    System.out.println(uploadFilterOss("atguigu220827",
+            "oss-cn-guangzhou.aliyuncs.com",
+            "atguigu220827.oss-cn-guangzhou.aliyuncs.com",
+            "LTAI5t5vpW9Fcqk8qBW7nvcV",
+            "fWxGZing02E6uZKE4NNV9W8RrzjjCT",
+            inputStream,
+            "333.jpg"));
+}
+```
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661871136021-a5e2cf75-5624-433d-9921-3219af6548b0.png)
+
+
+
+#### 1.7.4 如果报错: `Error: A JNI error has occurred, please check your installation and try agai`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661871030772-b4841106-bd85-4339-a44e-21f1061259eb.png)
+
+- 解决
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1661870974600-b84e3c3a-887a-4c88-a465-3c018a9a6c63.png)

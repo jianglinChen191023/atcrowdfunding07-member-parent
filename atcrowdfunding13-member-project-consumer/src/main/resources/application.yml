@@ -1,0 +1,29 @@
+server:
+  port: 5000
+
+spring:
+  application:
+    name: atguigu-crowd-project
+  session:
+    store-type: redis
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:1000/eureka
+
+ribbon:
+  # 10秒 - 处理请求的超时时间，默认为5秒
+  ReadTimeout: 10000
+  # 10秒 - 连接建立的超时时长，默认5秒
+  ConnectTimeout: 10000
+
+# 阿里云 oss 对象存储
+aliyun:
+  oss:
+    bucket-name: atguigu220827
+    end-point: oss-cn-guangzhou.aliyuncs.com
+    bucket-domain: atguigu220827.oss-cn-guangzhou.aliyuncs.com
+    access-key-id: LTAI5t5vpW9Fcqk8qBW7nvcV
+    access-key-secret: fWxGZing02E6uZKE4NNV9W8RrzjjCT
+
