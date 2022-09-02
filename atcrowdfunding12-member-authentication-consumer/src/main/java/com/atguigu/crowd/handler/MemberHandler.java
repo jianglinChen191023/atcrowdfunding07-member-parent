@@ -89,7 +89,7 @@ public class MemberHandler {
         MemberLoginVO memberLoginVO = new MemberLoginVO(memberPO.getId(), memberPO.getUsername(), memberPO.getEmail());
         // ATTR_NAME_LOGIN_MEMBER = loginMember
         session.setAttribute(CrowdConstant.ATTR_NAME_LOGIN_MEMBER, memberLoginVO);
-
+        System.out.println(CrowdConstant.ZUUL_PATH_VALUE);
         return "redirect:" + CrowdConstant.ZUUL_PATH_VALUE + "/auth/member/to/conter/page";
     }
 
