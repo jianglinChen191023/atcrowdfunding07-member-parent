@@ -6319,7 +6319,7 @@ public class CrowdAccessFilter extends ZuulFilter {
      * @param session
      */
     public void setSessionValue(HttpSession session) {
-        if (!CrowdConstant.ZUUL_PATH_VALUE.equals(session.getAttribute(CrowdConstant.ZUUL_PATH_KEY))) {
+        if (!(CrowdConstant.ZUUL_PATH_VALUE.equals(session.getAttribute(CrowdConstant.ZUUL_PATH_KEY)))) {
             session.setAttribute(CrowdConstant.ZUUL_PATH_KEY, CrowdConstant.ZUUL_PATH_VALUE);
         }
     }
