@@ -6786,8 +6786,8 @@ ribbon:
 aliyun:
   oss:
     bucket-name: atguigu220827
-    end-point: oss-cn-guangzhou.aliyuncs.com
-    bucket-domain: atguigu220827.oss-cn-guangzhou.aliyuncs.com
+    end-point: https://oss-cn-guangzhou.aliyuncs.com
+    bucket-domain: https://atguigu220827.oss-cn-guangzhou.aliyuncs.com
     access-key-id: LTAI5t5vpW9Fcqk8qBW7nvcV
     access-key-secret: fWxGZing02E6uZKE4NNV9W8RrzjjCT
 ```
@@ -6892,10 +6892,10 @@ aliyun:
 ```java
 public static void main(String[] args) throws FileNotFoundException {
     FileInputStream inputStream = new FileInputStream("/Users/chenjianglin/Desktop/333.jpg");
-    // ResultEntity{result='SUCCESS', message='null', data=atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220830/837093df-ee43-4370-8c44-48180fcb59eb.jpg}
+    // ResultEntity{result='SUCCESS', message='null', data=https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220830/837093df-ee43-4370-8c44-48180fcb59eb.jpg}
     System.out.println(uploadFilterOss("atguigu220827",
-            "oss-cn-guangzhou.aliyuncs.com",
-            "atguigu220827.oss-cn-guangzhou.aliyuncs.com",
+            "https://oss-cn-guangzhou.aliyuncs.com",
+            "https://atguigu220827.oss-cn-guangzhou.aliyuncs.com",
             "LTAI5t5vpW9Fcqk8qBW7nvcV",
             "fWxGZing02E6uZKE4NNV9W8RrzjjCT",
             inputStream,
