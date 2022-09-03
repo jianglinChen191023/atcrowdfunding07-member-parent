@@ -22,8 +22,8 @@ ribbon:
 aliyun:
   oss:
     bucket-name: atguigu220827
-    end-point: oss-cn-guangzhou.aliyuncs.com
-    bucket-domain: atguigu220827.oss-cn-guangzhou.aliyuncs.com
+    end-point: https://oss-cn-guangzhou.aliyuncs.com
+    bucket-domain: https://atguigu220827.oss-cn-guangzhou.aliyuncs.com
     access-key-id: LTAI5t5vpW9Fcqk8qBW7nvcV
     access-key-secret: fWxGZing02E6uZKE4NNV9W8RrzjjCT
 
