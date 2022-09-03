@@ -2,6 +2,7 @@ package com.atguigu.crowd.mapper;
 
 import com.atguigu.crowd.entity.po.ProjectPO;
 import com.atguigu.crowd.entity.po.ProjectPOExample;
+import com.atguigu.crowd.entity.vo.PortalTypeVO;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -51,4 +52,10 @@ public interface ProjectPOMapper {
             @Param("projectId") Integer projectId
     );
 
+    /**
+     * 查询首页数据
+     *
+     * @return
+     */
+    List<PortalTypeVO> selectPortalTypeVOList();
 }

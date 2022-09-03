@@ -1,5 +1,6 @@
 package com.atguigu.crowd.handler;
 
+import com.atguigu.crowd.entity.vo.PortalTypeVO;
 import com.atguigu.crowd.entity.vo.ProjectVO;
 import com.atguigu.crowd.service.api.ProjectService;
 import com.atguigu.crowd.util.ResultEntity;
@@ -8,6 +9,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * @author 陈江林
@@ -23,7 +26,7 @@ public class ProjectProviderHandler {
      * 保存会员发起的众筹信息
      *
      * @param projectVO 众筹信息
-     * @param memberId 会员 id
+     * @param memberId  会员 id
      * @return
      */
     @RequestMapping("/save/project/vo/remote")
@@ -35,6 +38,18 @@ public class ProjectProviderHandler {
             e.printStackTrace();
             return ResultEntity.failed(e.getMessage());
         }
+    }
+
+    @RequestMapping("/get/portal/type/project/data/remote")
+    public ResultEntity<List<PortalTypeVO>> getPortalTypeProjectDataRemote() {
+
+        try {
+            List<PortalTypeVO> portalTypeVOList = projectService.getPortalTypeVO();
+            return ResultEntity.successWithData(portalTypeVOList);
+        } catch (Exception e) {
+            return ResultEntity.failed(e.getMessage());
+        }
+
     }
 
 }

@@ -1,6 +1,9 @@
 package com.atguigu.crowd.service.api;
 
+import com.atguigu.crowd.entity.vo.PortalTypeVO;
 import com.atguigu.crowd.entity.vo.ProjectVO;
+
+import java.util.List;
 
 /**
  * @author 陈江林
@@ -16,5 +19,12 @@ public interface ProjectService {
      * @return
      */
     void saveProject(ProjectVO projectVO, Integer memberId);
+
+    /**
+     * 查询首页数据
+     *
+     * @return
+     */
+    List<PortalTypeVO> getPortalTypeVO();
 
 }
