@@ -1,14 +1,12 @@
 package com.atguigu.crowd.handler;
 
+import com.atguigu.crowd.entity.vo.DetailProjectVO;
 import com.atguigu.crowd.entity.vo.PortalTypeVO;
 import com.atguigu.crowd.entity.vo.ProjectVO;
 import com.atguigu.crowd.service.api.ProjectService;
 import com.atguigu.crowd.util.ResultEntity;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -47,6 +45,19 @@ public class ProjectProviderHandler {
             List<PortalTypeVO> portalTypeVOList = projectService.getPortalTypeVO();
             return ResultEntity.successWithData(portalTypeVOList);
         } catch (Exception e) {
+            return ResultEntity.failed(e.getMessage());
+        }
+
+    }
+
+    @RequestMapping("/get/project/detail/remote/{projectId}")
+    ResultEntity<DetailProjectVO> getDetailProjectVORemote(@PathVariable("projectId") Integer projectId) {
+
+        try {
+            DetailProjectVO detailProjectVOById = projectService.getDetailProjectVO(projectId);
+            return ResultEntity.successWithData(detailProjectVOById);
+        } catch (Exception e) {
+            e.printStackTrace();
             return ResultEntity.failed(e.getMessage());
         }
 

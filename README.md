@@ -234,6 +234,34 @@
             - [2.7.1 追加 `mysql 的 Feign 接口` 代码【`api` 工程】](#271-追加-mysql-的-feign-接口-代码api-工程)
             - [2.7.2 保存会员发起的众筹信息 【`mysql` 工程】](#272-保存会员发起的众筹信息-mysql-工程)
 
+- [二十一 前台-首页显示项目](#二十一-前台-首页显示项目)
+    - [1. 首页显示项目](#1-首页显示项目)
+        - [1.1 目标](#11-目标)
+        - [1.2 思路](#12-思路)
+        - [1.3 数据库](#13-数据库)
+            - [1.3.1 分类表数据](#131-分类表数据)
+            - [1.3.2 标签表数据](#132-标签表数据)
+            - [1.3.3 数据库备份](#133-数据库备份)
+        - [1.4 代码](#14-代码)
+            - [1.4.1 新建 `PortalTypeVO` 实体类【`entity` 工程】](#141-新建-portaltypevo-实体类entity-工程)
+            - [1.4.2 新建 `PortalProjectVO` 实体类【`entity` 工程】](#142-新建-portalprojectvo-实体类entity-工程)
+            - [1.4.3  暴露数据查询的接口【`mysql` 工程】](#143--暴露数据查询的接口mysql-工程)
+            - [1.4.4 声明一个 Feign 的接口 【`api` 工程】](#144-声明一个-feign-的接口-api-工程)
+            - [1.4.5 调用 `mysql` 暴露的接口拿到数据存入到模型 【`auth` 工程】](#145-调用-mysql-暴露的接口拿到数据存入到模型-auth-工程)
+            - [1.4.6 在 `portal.html` 中显示模型中的数据【`auth` 工程】](#146-在-portalhtml-中显示模型中的数据auth-工程)
+    - [2. 显示项目详情](#2-显示项目详情)
+        - [2.1 目标](#21-目标)
+        - [2.2 思路](#22-思路)
+        - [2.3 代码](#23-代码)
+            - [2.3.1 创建 `DetailProjectVO`实体类【`entity` 工程】](#231-创建-detailprojectvo实体类entity-工程)
+            - [2.3.2 创建 `DetailReturnVO`实体类【`entity` 工程】](#232-创建-detailreturnvo实体类entity-工程)
+            - [2.3.3 暴露数据查询的接口【`mysql` 工程】](#233-暴露数据查询的接口mysql-工程)
+            - [2.3.4 声明一个 Feign 的接口 【`api` 工程】](#234-声明一个-feign-的接口-api-工程)
+            - [2.3.5 首页跳转到项目详情 `portal.html`【`auth` 工程】](#235-首页跳转到项目详情-portalhtmlauth-工程)
+            - [2.3.6 调用 `mysql` 暴露的接口拿到数据存入到模型 【`project` 工程】](#236-调用-mysql-暴露的接口拿到数据存入到模型-project-工程)
+            - [2.3.7 新建 `project-show-detail.html` 中显示模型中的数据【`project` 工程】](#237-新建-project-show-detailhtml-中显示模型中的数据project-工程)
+
+
 # 十六 会员系统-搭建环境
 
 ## 1. 尚筹网会员系统总目标
@@ -11111,3 +11139,2634 @@ public class ProjectServiceImpl implements ProjectService {
         </foreach>
     </insert>
 ```
+
+# 二十一 前台-首页显示项目
+
+```
+git checkout -b 21.0.0_show_project
+```
+
+![img](https://cdn.nlark.com/yuque/0/2022/jpeg/12811585/1662398142885-802924ba-8cb7-4a81-943e-8864a80d408f.jpeg)
+
+
+
+## 1. 首页显示项目
+
+### 1.1 目标
+
+- 在首页上加载真实保存到数据库的项目数据, 按分类显示
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662126573723-a2bef104-c20d-4ab7-b42f-305e54ed86a7.png)
+
+
+
+### 1.2 思路
+
+![img](https://cdn.nlark.com/yuque/0/2022/jpeg/12811585/1662127706792-3bce335e-7868-4c90-a9a1-e71f5f34d4fa.jpeg)
+
+
+
+### 1.3 数据库
+
+#### 1.3.1 分类表数据
+
+```plsql
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------
+-- Table structure for t_type
+-- ----------------------------
+DROP TABLE IF EXISTS `t_type`;
+CREATE TABLE `t_type` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) DEFAULT NULL COMMENT '分类名称',
+  `remark` varchar(255) DEFAULT NULL COMMENT '分类说明',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8 COMMENT='分类表';
+
+-- ----------------------------
+-- Records of t_type
+-- ----------------------------
+BEGIN;
+INSERT INTO `t_type` (`id`, `name`, `remark`) VALUES (1, '科技', '开启科技未来');
+INSERT INTO `t_type` (`id`, `name`, `remark`) VALUES (2, '设计', '创建改变未来');
+INSERT INTO `t_type` (`id`, `name`, `remark`) VALUES (3, '公益', '汇集点点爱心');
+INSERT INTO `t_type` (`id`, `name`, `remark`) VALUES (4, '农业', '网络天下肥美');
+COMMIT;
+
+SET FOREIGN_KEY_CHECKS = 1;
+```
+
+
+
+#### 1.3.2 标签表数据
+
+```plsql
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------
+-- Table structure for t_tag
+-- ----------------------------
+DROP TABLE IF EXISTS `t_tag`;
+CREATE TABLE `t_tag` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `pid` int(11) DEFAULT NULL,
+  `name` varchar(255) DEFAULT NULL COMMENT '标签名称',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8 COMMENT='标签表';
+
+-- ----------------------------
+-- Records of t_tag
+-- ----------------------------
+BEGIN;
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (1, NULL, '手机');
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (2, NULL, '数码');
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (3, NULL, '电脑');
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (4, 1, '大屏');
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (5, 1, '美颜');
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (6, 1, '续航');
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (7, 2, '高解析度');
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (8, 2, '高清');
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (9, 3, '大内存');
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (10, 3, '固态');
+COMMIT;
+
+SET FOREIGN_KEY_CHECKS = 1;
+```
+
+
+
+#### 1.3.3 数据库备份
+
+```plsql
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------
+-- Table structure for inner_admin_role
+-- ----------------------------
+DROP TABLE IF EXISTS `inner_admin_role`;
+CREATE TABLE `inner_admin_role` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `admin_id` int(11) DEFAULT NULL,
+  `role_id` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8 COMMENT='用户和权限中间表';
+
+-- ----------------------------
+-- Records of inner_admin_role
+-- ----------------------------
+BEGIN;
+INSERT INTO `inner_admin_role` (`id`, `admin_id`, `role_id`) VALUES (1, 2, 2);
+INSERT INTO `inner_admin_role` (`id`, `admin_id`, `role_id`) VALUES (2, 2, 4);
+INSERT INTO `inner_admin_role` (`id`, `admin_id`, `role_id`) VALUES (3, 1, 1);
+INSERT INTO `inner_admin_role` (`id`, `admin_id`, `role_id`) VALUES (4, 1, 3);
+INSERT INTO `inner_admin_role` (`id`, `admin_id`, `role_id`) VALUES (5, 7, 5);
+COMMIT;
+
+-- ----------------------------
+-- Table structure for inner_role_auth
+-- ----------------------------
+DROP TABLE IF EXISTS `inner_role_auth`;
+CREATE TABLE `inner_role_auth` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `role_id` int(11) DEFAULT NULL,
+  `auth_id` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8 COMMENT='角色和权限中间表';
+
+-- ----------------------------
+-- Records of inner_role_auth
+-- ----------------------------
+BEGIN;
+INSERT INTO `inner_role_auth` (`id`, `role_id`, `auth_id`) VALUES (1, 3, 4);
+INSERT INTO `inner_role_auth` (`id`, `role_id`, `auth_id`) VALUES (2, 4, 6);
+INSERT INTO `inner_role_auth` (`id`, `role_id`, `auth_id`) VALUES (3, 4, 3);
+COMMIT;
+
+-- ----------------------------
+-- Table structure for t_admin
+-- ----------------------------
+DROP TABLE IF EXISTS `t_admin`;
+CREATE TABLE `t_admin` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `login_acct` varchar(255) NOT NULL,
+  `user_pswd` varchar(255) NOT NULL,
+  `user_name` varchar(255) NOT NULL,
+  `email` varchar(255) NOT NULL,
+  `create_time` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8;
+
+-- ----------------------------
+-- Records of t_admin
+-- ----------------------------
+BEGIN;
+INSERT INTO `t_admin` (`id`, `login_acct`, `user_pswd`, `user_name`, `email`, `create_time`) VALUES (1, 'adminOperator', '$2a$10$YlFApwsuOTRxvVlzIKJ1IO20wPftE57QovWuBsKoh2NEYZWKLT6jK', '经理', '1@qq.com', '2022-08-06 15:50:25');
+INSERT INTO `t_admin` (`id`, `login_acct`, `user_pswd`, `user_name`, `email`, `create_time`) VALUES (2, 'roleOperator', '$2a$10$YlFApwsuOTRxvVlzIKJ1IO20wPftE57QovWuBsKoh2NEYZWKLT6jK', '部长', '2@qq.com', '2022-08-06 15:50:25');
+INSERT INTO `t_admin` (`id`, `login_acct`, `user_pswd`, `user_name`, `email`, `create_time`) VALUES (3, 'admin01', '$2a$10$YlFApwsuOTRxvVlzIKJ1IO20wPftE57QovWuBsKoh2NEYZWKLT6jK', '路人甲', '3@qq.com', '2022-08-06 15:50:25');
+INSERT INTO `t_admin` (`id`, `login_acct`, `user_pswd`, `user_name`, `email`, `create_time`) VALUES (4, 'admin02', '2a$10$YlFApwsuOTRxvVlzIKJ1IO20wPftE57QovWuBsKoh2NEYZWKLT6jK', '路人甲', '3@qq.com', '2022-08-06 15:50:25');
+INSERT INTO `t_admin` (`id`, `login_acct`, `user_pswd`, `user_name`, `email`, `create_time`) VALUES (5, 'admin03', '$2a$10$YlFApwsuOTRxvVlzIKJ1IO20wPftE57QovWuBsKoh2NEYZWKLT6jK', '路人甲', '3@qq.com', '2022-08-06 15:50:25');
+INSERT INTO `t_admin` (`id`, `login_acct`, `user_pswd`, `user_name`, `email`, `create_time`) VALUES (6, 'CS3', '$2a$10$elqat0c.KxAlnRV58VOBfuCMboRRNnKG4Qs1bcc4qJDAQTqPLDRTi', '测试3', '1912623646@qq.com', '2022-08-08 01:46:56');
+INSERT INTO `t_admin` (`id`, `login_acct`, `user_pswd`, `user_name`, `email`, `create_time`) VALUES (7, 'root', '$2a$10$YlFApwsuOTRxvVlzIKJ1IO20wPftE57QovWuBsKoh2NEYZWKLT6jK', '超级管理员', '0@qq.com', '2022-08-08 03:10:44');
+COMMIT;
+
+-- ----------------------------
+-- Table structure for t_auth
+-- ----------------------------
+DROP TABLE IF EXISTS `t_auth`;
+CREATE TABLE `t_auth` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(200) DEFAULT NULL,
+  `title` varchar(200) DEFAULT NULL,
+  `category_id` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8 COMMENT='权限表';
+
+-- ----------------------------
+-- Records of t_auth
+-- ----------------------------
+BEGIN;
+INSERT INTO `t_auth` (`id`, `name`, `title`, `category_id`) VALUES (1, '', '用户模块', NULL);
+INSERT INTO `t_auth` (`id`, `name`, `title`, `category_id`) VALUES (2, 'user:delete', '删除', 1);
+INSERT INTO `t_auth` (`id`, `name`, `title`, `category_id`) VALUES (3, 'user:get', '查询', 1);
+INSERT INTO `t_auth` (`id`, `name`, `title`, `category_id`) VALUES (4, 'user:save', '保存', 1);
+INSERT INTO `t_auth` (`id`, `name`, `title`, `category_id`) VALUES (5, '', '角色模块', NULL);
+INSERT INTO `t_auth` (`id`, `name`, `title`, `category_id`) VALUES (6, 'role:delete', '删除', 4);
+INSERT INTO `t_auth` (`id`, `name`, `title`, `category_id`) VALUES (7, 'role:get', '查询', 4);
+INSERT INTO `t_auth` (`id`, `name`, `title`, `category_id`) VALUES (8, 'role:save', '保存', 4);
+COMMIT;
+
+-- ----------------------------
+-- Table structure for t_member
+-- ----------------------------
+DROP TABLE IF EXISTS `t_member`;
+CREATE TABLE `t_member` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `loginacct` varchar(255) NOT NULL,
+  `userpswd` varchar(255) NOT NULL,
+  `username` varchar(255) DEFAULT NULL,
+  `email` varchar(255) DEFAULT NULL,
+  `authstatus` int(4) DEFAULT NULL COMMENT '实名认证状态 [{0: 未实名认证}, {1: 实名认证申请中}, {2: 已实名认证}]',
+  `usertype` int(4) DEFAULT NULL COMMENT '[{0: 个人}, {1: 企业}]',
+  `realname` varchar(255) DEFAULT NULL COMMENT '真实姓名',
+  `cardnum` varchar(255) DEFAULT NULL COMMENT '卡号',
+  `accttype` int(4) DEFAULT NULL COMMENT '[{0: 企业}, {1: 个体}, {2: 个人}, {3: 政府}]',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `t_member_pk` (`loginacct`)
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8;
+
+-- ----------------------------
+-- Records of t_member
+-- ----------------------------
+BEGIN;
+INSERT INTO `t_member` (`id`, `loginacct`, `userpswd`, `username`, `email`, `authstatus`, `usertype`, `realname`, `cardnum`, `accttype`) VALUES (1, 'jack', '$2a$10$L/7qsHMpVsCRePdhzF7mbuGw2VBCbPd4oOR7I3W6TF04DFHUyb3Qe', '杰克', 'jack@qq.com', 1, 1, '杰克', '430626220104045821', 2);
+INSERT INTO `t_member` (`id`, `loginacct`, `userpswd`, `username`, `email`, `authstatus`, `usertype`, `realname`, `cardnum`, `accttype`) VALUES (5, 'tom', '123', NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+INSERT INTO `t_member` (`id`, `loginacct`, `userpswd`, `username`, `email`, `authstatus`, `usertype`, `realname`, `cardnum`, `accttype`) VALUES (6, 'qq', '$2a$10$qX4Dk3KHBnLo.AnkY4ngaeFkn0FBJcX3a3IWmFIjdFsv1rTifePD6', 'user', '123456@qq.com', NULL, NULL, NULL, NULL, NULL);
+INSERT INTO `t_member` (`id`, `loginacct`, `userpswd`, `username`, `email`, `authstatus`, `usertype`, `realname`, `cardnum`, `accttype`) VALUES (9, 'www', '$2a$10$fiOPIrd3LqtgpGxnAuPbsu0NUoz02RQLomTUCBLmsH/aqSHvDPEqO', 'eav', '123123@qq.com', NULL, NULL, NULL, NULL, NULL);
+COMMIT;
+
+-- ----------------------------
+-- Table structure for t_member_confirm_info
+-- ----------------------------
+DROP TABLE IF EXISTS `t_member_confirm_info`;
+CREATE TABLE `t_member_confirm_info` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `memberid` int(11) DEFAULT NULL COMMENT 't_member 会员标识',
+  `paynum` varchar(255) DEFAULT NULL COMMENT '易付宝企业账号',
+  `cardnum` varchar(255) DEFAULT NULL COMMENT '法人身份证号',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8 COMMENT='发起人确认信息表';
+
+-- ----------------------------
+-- Records of t_member_confirm_info
+-- ----------------------------
+BEGIN;
+INSERT INTO `t_member_confirm_info` (`id`, `memberid`, `paynum`, `cardnum`) VALUES (1, 1, '24123', '41234123');
+INSERT INTO `t_member_confirm_info` (`id`, `memberid`, `paynum`, `cardnum`) VALUES (2, 1, '3123432', '31241324');
+INSERT INTO `t_member_confirm_info` (`id`, `memberid`, `paynum`, `cardnum`) VALUES (3, 1, '4535', '3453453');
+INSERT INTO `t_member_confirm_info` (`id`, `memberid`, `paynum`, `cardnum`) VALUES (4, 1, 'jack', '123123');
+INSERT INTO `t_member_confirm_info` (`id`, `memberid`, `paynum`, `cardnum`) VALUES (5, 1, '234234', '23423423423');
+INSERT INTO `t_member_confirm_info` (`id`, `memberid`, `paynum`, `cardnum`) VALUES (6, 1, '312312', '123123');
+COMMIT;
+
+-- ----------------------------
+-- Table structure for t_member_copy1
+-- ----------------------------
+DROP TABLE IF EXISTS `t_member_copy1`;
+CREATE TABLE `t_member_copy1` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `loginacct` varchar(255) NOT NULL,
+  `userpswd` varchar(255) NOT NULL,
+  `username` varchar(255) DEFAULT NULL,
+  `email` varchar(255) DEFAULT NULL,
+  `authstatus` int(4) DEFAULT NULL COMMENT '实名认证状态 [{0: 未实名认证}, {1: 实名认证申请中}, {2: 已实名认证}]',
+  `usertype` int(4) DEFAULT NULL COMMENT '[{0: 个人}, {1: 企业}]',
+  `realname` varchar(255) DEFAULT NULL COMMENT '真实姓名',
+  `cardnum` varchar(255) DEFAULT NULL COMMENT '卡号',
+  `accttype` int(4) DEFAULT NULL COMMENT '[{0: 企业}, {1: 个体}, {2: 个人}, {3: 政府}]',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `t_member_pk` (`loginacct`)
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8;
+
+-- ----------------------------
+-- Records of t_member_copy1
+-- ----------------------------
+BEGIN;
+INSERT INTO `t_member_copy1` (`id`, `loginacct`, `userpswd`, `username`, `email`, `authstatus`, `usertype`, `realname`, `cardnum`, `accttype`) VALUES (1, 'jack', '$2a$10$L/7qsHMpVsCRePdhzF7mbuGw2VBCbPd4oOR7I3W6TF04DFHUyb3Qe', '杰克', 'jack@qq.com', 1, 1, '杰克', '430626220104045821', 2);
+INSERT INTO `t_member_copy1` (`id`, `loginacct`, `userpswd`, `username`, `email`, `authstatus`, `usertype`, `realname`, `cardnum`, `accttype`) VALUES (5, 'tom', '123', NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+INSERT INTO `t_member_copy1` (`id`, `loginacct`, `userpswd`, `username`, `email`, `authstatus`, `usertype`, `realname`, `cardnum`, `accttype`) VALUES (6, 'qq', '$2a$10$qX4Dk3KHBnLo.AnkY4ngaeFkn0FBJcX3a3IWmFIjdFsv1rTifePD6', 'user', '123456@qq.com', NULL, NULL, NULL, NULL, NULL);
+COMMIT;
+
+-- ----------------------------
+-- Table structure for t_member_launch_info
+-- ----------------------------
+DROP TABLE IF EXISTS `t_member_launch_info`;
+CREATE TABLE `t_member_launch_info` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `memberid` int(11) DEFAULT NULL COMMENT 't_member 会员标识',
+  `description_simple` varchar(255) DEFAULT NULL COMMENT '自我介绍',
+  `description_detail` varchar(255) DEFAULT NULL COMMENT '详细介绍',
+  `phone_num` varchar(255) DEFAULT NULL COMMENT '联系电话',
+  `service_num` varchar(255) DEFAULT NULL COMMENT '客服电话',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8 COMMENT='项目发起人信息表';
+
+-- ----------------------------
+-- Records of t_member_launch_info
+-- ----------------------------
+BEGIN;
+INSERT INTO `t_member_launch_info` (`id`, `memberid`, `description_simple`, `description_detail`, `phone_num`, `service_num`) VALUES (9, 1, 'i am mao', '我是猫哥', '123456', '654321');
+INSERT INTO `t_member_launch_info` (`id`, `memberid`, `description_simple`, `description_detail`, `phone_num`, `service_num`) VALUES (10, 1, 'i am mao', '我是猫哥', '123456', '654321');
+INSERT INTO `t_member_launch_info` (`id`, `memberid`, `description_simple`, `description_detail`, `phone_num`, `service_num`) VALUES (11, 1, 'i am mao', '我是猫哥', '123456', '654321');
+INSERT INTO `t_member_launch_info` (`id`, `memberid`, `description_simple`, `description_detail`, `phone_num`, `service_num`) VALUES (12, 1, 'i am mao', '我是猫哥', '123456', '654321');
+INSERT INTO `t_member_launch_info` (`id`, `memberid`, `description_simple`, `description_detail`, `phone_num`, `service_num`) VALUES (13, 1, 'i am mao', '我是猫哥', '123456', '654321');
+INSERT INTO `t_member_launch_info` (`id`, `memberid`, `description_simple`, `description_detail`, `phone_num`, `service_num`) VALUES (14, 1, 'i am mao', '我是猫哥', '123456', '654321');
+COMMIT;
+
+-- ----------------------------
+-- Table structure for t_menu
+-- ----------------------------
+DROP TABLE IF EXISTS `t_menu`;
+CREATE TABLE `t_menu` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `pid` int(11) DEFAULT NULL,
+  `name` varchar(200) DEFAULT NULL,
+  `url` varchar(200) DEFAULT NULL,
+  `icon` varchar(200) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8;
+
+-- ----------------------------
+-- Records of t_menu
+-- ----------------------------
+BEGIN;
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (1, NULL, '系统权限菜单', NULL, 'glyphicon glyphicon-th-list');
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (2, 1, ' 控 制 面 板 ', 'main.htm', 'glyphicon glyphicon-dashboard');
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (3, 1, '权限管理', NULL, 'glyphicon glyphicon glyphicon-tasks');
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (4, 3, ' 用 户 维 护 ', 'user/index.htm', 'glyphicon glyphicon-user');
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (5, 3, ' 角 色 维 护 ', 'role/index.htm', 'glyphicon glyphicon-king');
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (6, 3, ' 菜 单 维 护 ', 'permission/index.htm', 'glyphicon glyphicon-lock');
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (7, 1, ' 业 务 审 核 ', NULL, 'glyphicon glyphicon-ok');
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (8, 7, ' 实 名 认 证 审 核 ', 'auth_cert/index.htm', 'glyphicon glyphicon-check');
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (9, 7, ' 广 告 审 核 ', 'auth_adv/index.htm', 'glyphicon glyphicon-check');
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (10, 7, ' 项 目 审 核 ', 'auth_project/index.htm', 'glyphicon glyphicon-check');
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (11, 1, ' 业 务 管 理 ', NULL, 'glyphicon glyphicon-th-large');
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (12, 11, ' 资 质 维 护 ', 'cert/index.htm', 'glyphicon glyphicon-picture');
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (13, 11, ' 分 类 管 理 ', 'certtype/index.htm', 'glyphicon glyphicon-equalizer');
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (14, 11, ' 流 程 管 理 ', 'process/index.htm', 'glyphicon glyphicon-random');
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (15, 11, ' 广 告 管 理 ', 'advert/index.htm', 'glyphicon glyphicon-hdd');
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (16, 11, ' 消 息 模 板 ', 'message/index.htm', 'glyphicon glyphicon-comment');
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (17, 11, ' 项 目 分 类 ', 'projectType/index.htm', 'glyphicon glyphicon-list');
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (18, 11, ' 项 目 标 签 ', 'tag/index.htm', 'glyphicon glyphicon-tags');
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (19, 1, ' 参 数 管 理 ', 'param/index.htm', 'glyphicon glyphicon-list-alt');
+INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (20, 1, 'A', 'A', 'glyphicon glyphicon-list-alt');
+COMMIT;
+
+-- ----------------------------
+-- Table structure for t_project
+-- ----------------------------
+DROP TABLE IF EXISTS `t_project`;
+CREATE TABLE `t_project` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `project_name` varchar(255) DEFAULT NULL COMMENT '项目名称',
+  `project_description` varchar(255) DEFAULT NULL COMMENT '项目描述',
+  `money` bigint(11) DEFAULT NULL COMMENT '筹集金额',
+  `day` int(11) DEFAULT NULL COMMENT '筹集天数',
+  `status` int(4) DEFAULT NULL COMMENT '[{0: 审核中}, {1: 众筹中}, {2: 众筹成功}, {3: 众筹失败}]',
+  `deploydate` varchar(255) DEFAULT NULL COMMENT '项目发起时间',
+  `supportmoney` bigint(11) DEFAULT NULL COMMENT '已筹集到的金额',
+  `supporter` int(11) DEFAULT NULL COMMENT '支持人数',
+  `completion` int(3) DEFAULT NULL COMMENT '百分比完成度',
+  `memberid` int(11) DEFAULT NULL COMMENT '发起人的会员标识',
+  `createdate` varchar(19) DEFAULT NULL COMMENT '项目创建时间',
+  `follower` int(11) DEFAULT NULL COMMENT '关注人数',
+  `header_picture_path` varchar(255) DEFAULT NULL COMMENT '头图路径',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8 COMMENT='项目表';
+
+-- ----------------------------
+-- Records of t_project
+-- ----------------------------
+BEGIN;
+INSERT INTO `t_project` (`id`, `project_name`, `project_description`, `money`, `day`, `status`, `deploydate`, `supportmoney`, `supporter`, `completion`, `memberid`, `createdate`, `follower`, `header_picture_path`) VALUES (15, 'brotherMao', '就是帅！', 100, 30, 0, '2022-09-04', 11, 1, 11, 1, '2022-09-03', 11, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/4fcaa821-f0b7-46f8-aebc-825bb1e208b2.jpg');
+INSERT INTO `t_project` (`id`, `project_name`, `project_description`, `money`, `day`, `status`, `deploydate`, `supportmoney`, `supporter`, `completion`, `memberid`, `createdate`, `follower`, `header_picture_path`) VALUES (16, 'brotherMao', '就是帅！', 100, 30, 0, '2022-09-04', 11, 2, 11, 1, '2022-09-03', 12, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/4fcaa821-f0b7-46f8-aebc-825bb1e208b2.jpg');
+INSERT INTO `t_project` (`id`, `project_name`, `project_description`, `money`, `day`, `status`, `deploydate`, `supportmoney`, `supporter`, `completion`, `memberid`, `createdate`, `follower`, `header_picture_path`) VALUES (17, 'brotherMao', '就是帅！', 100, 30, 0, '2022-09-04', 11, 3, 11, 1, '2022-09-03', 13, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/4fcaa821-f0b7-46f8-aebc-825bb1e208b2.jpg');
+INSERT INTO `t_project` (`id`, `project_name`, `project_description`, `money`, `day`, `status`, `deploydate`, `supportmoney`, `supporter`, `completion`, `memberid`, `createdate`, `follower`, `header_picture_path`) VALUES (18, 'brotherMao', '就是帅！', 100, 30, 0, '2022-09-04', 11, 4, 11, 1, '2022-09-03', 14, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/4fcaa821-f0b7-46f8-aebc-825bb1e208b2.jpg');
+INSERT INTO `t_project` (`id`, `project_name`, `project_description`, `money`, `day`, `status`, `deploydate`, `supportmoney`, `supporter`, `completion`, `memberid`, `createdate`, `follower`, `header_picture_path`) VALUES (19, 'brotherMao', '就是帅！', 100, 30, 0, '2022-09-01', 11, 5, 11, 1, '2022-09-03', 15, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/4fcaa821-f0b7-46f8-aebc-825bb1e208b2.jpg');
+INSERT INTO `t_project` (`id`, `project_name`, `project_description`, `money`, `day`, `status`, `deploydate`, `supportmoney`, `supporter`, `completion`, `memberid`, `createdate`, `follower`, `header_picture_path`) VALUES (20, 'brotherMao', '就是帅！', 100, 30, 0, '2022-09-04', 11, 6, 11, 1, '2022-09-04', 16, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/4fcaa821-f0b7-46f8-aebc-825bb1e208b2.jpg');
+COMMIT;
+
+-- ----------------------------
+-- Table structure for t_project_item_pic
+-- ----------------------------
+DROP TABLE IF EXISTS `t_project_item_pic`;
+CREATE TABLE `t_project_item_pic` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `projectid` int(11) DEFAULT NULL COMMENT 't_project 标识',
+  `item_pic_path` varchar(255) DEFAULT NULL COMMENT '图片名称',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8 COMMENT='项目表项目详情图片表';
+
+-- ----------------------------
+-- Records of t_project_item_pic
+-- ----------------------------
+BEGIN;
+INSERT INTO `t_project_item_pic` (`id`, `projectid`, `item_pic_path`) VALUES (9, 15, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/deb8461d-cdb4-4652-9aed-096a63671bdb.jpg');
+INSERT INTO `t_project_item_pic` (`id`, `projectid`, `item_pic_path`) VALUES (10, 16, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/deb8461d-cdb4-4652-9aed-096a63671bdb.jpg');
+INSERT INTO `t_project_item_pic` (`id`, `projectid`, `item_pic_path`) VALUES (11, 17, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/deb8461d-cdb4-4652-9aed-096a63671bdb.jpg');
+INSERT INTO `t_project_item_pic` (`id`, `projectid`, `item_pic_path`) VALUES (12, 18, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/deb8461d-cdb4-4652-9aed-096a63671bdb.jpg');
+INSERT INTO `t_project_item_pic` (`id`, `projectid`, `item_pic_path`) VALUES (13, 19, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/deb8461d-cdb4-4652-9aed-096a63671bdb.jpg');
+INSERT INTO `t_project_item_pic` (`id`, `projectid`, `item_pic_path`) VALUES (14, 20, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/deb8461d-cdb4-4652-9aed-096a63671bdb.jpg');
+COMMIT;
+
+-- ----------------------------
+-- Table structure for t_project_tag
+-- ----------------------------
+DROP TABLE IF EXISTS `t_project_tag`;
+CREATE TABLE `t_project_tag` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `projectid` int(11) DEFAULT NULL COMMENT 't_project 标识',
+  `tagid` int(11) DEFAULT NULL COMMENT 't_tag 标识',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=38 DEFAULT CHARSET=utf8 COMMENT='项目标签中间表';
+
+-- ----------------------------
+-- Records of t_project_tag
+-- ----------------------------
+BEGIN;
+INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (19, 15, 4);
+INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (20, 15, 7);
+INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (21, 16, 9);
+INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (22, 16, 7);
+INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (23, 17, 4);
+INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (24, 17, 7);
+INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (25, 17, 9);
+INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (26, 18, 7);
+INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (27, 18, 9);
+INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (28, 18, 7);
+INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (29, 18, 9);
+INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (30, 18, 7);
+INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (31, 18, 9);
+INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (32, 19, 4);
+INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (33, 19, 7);
+INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (34, 19, 9);
+INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (35, 20, 6);
+INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (36, 20, 8);
+INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (37, 20, 10);
+COMMIT;
+
+-- ----------------------------
+-- Table structure for t_project_type
+-- ----------------------------
+DROP TABLE IF EXISTS `t_project_type`;
+CREATE TABLE `t_project_type` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `projectid` int(11) DEFAULT NULL COMMENT 't_project 标识',
+  `typeid` int(11) DEFAULT NULL COMMENT 't_type 标识',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=39 DEFAULT CHARSET=utf8 COMMENT='项目和分类中间表';
+
+-- ----------------------------
+-- Records of t_project_type
+-- ----------------------------
+BEGIN;
+INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (29, 15, 2);
+INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (30, 15, 4);
+INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (31, 16, 2);
+INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (32, 16, 4);
+INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (33, 17, 2);
+INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (34, 17, 4);
+INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (35, 18, 2);
+INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (36, 18, 4);
+INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (37, 19, 1);
+INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (38, 20, 3);
+COMMIT;
+
+-- ----------------------------
+-- Table structure for t_return
+-- ----------------------------
+DROP TABLE IF EXISTS `t_return`;
+CREATE TABLE `t_return` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `projectid` int(11) DEFAULT NULL COMMENT 't_projcet 项目标识',
+  `type` int(4) DEFAULT NULL COMMENT '[{0: 实物回报}, {1: 虚拟物品回报}]',
+  `supportmoney` int(11) DEFAULT NULL COMMENT '支持金额',
+  `content` varchar(255) DEFAULT NULL COMMENT '回报内容',
+  `count` int(11) DEFAULT NULL COMMENT '回报产品限额 {0: 不限额回报数量}',
+  `signalpurchase` int(11) DEFAULT NULL COMMENT '是否设置单笔限购',
+  `purchase` int(11) DEFAULT NULL COMMENT '具体限购数量',
+  `freight` int(11) DEFAULT NULL COMMENT '运费 {0: 包邮}',
+  `invoice` int(4) DEFAULT NULL COMMENT '[{0: 不开发票}, {1: 开发票}]',
+  `returndate` int(11) DEFAULT NULL COMMENT '项目结束后多少天向支持者发送回报',
+  `describ_pic_path` varchar(255) DEFAULT NULL COMMENT '说明图片路径',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8 COMMENT='回报信息表';
+
+-- ----------------------------
+-- Records of t_return
+-- ----------------------------
+BEGIN;
+INSERT INTO `t_return` (`id`, `projectid`, `type`, `supportmoney`, `content`, `count`, `signalpurchase`, `purchase`, `freight`, `invoice`, `returndate`, `describ_pic_path`) VALUES (1, 15, 1, 10, '以身相许', 5, 1, 8, 0, 1, 15, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/56c4d3ca-cb1f-4cfb-9bff-64fec98e131b.jpg');
+INSERT INTO `t_return` (`id`, `projectid`, `type`, `supportmoney`, `content`, `count`, `signalpurchase`, `purchase`, `freight`, `invoice`, `returndate`, `describ_pic_path`) VALUES (2, 16, 1, 10, '以身相许', 5, 1, 8, 0, 1, 15, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/56c4d3ca-cb1f-4cfb-9bff-64fec98e131b.jpg');
+INSERT INTO `t_return` (`id`, `projectid`, `type`, `supportmoney`, `content`, `count`, `signalpurchase`, `purchase`, `freight`, `invoice`, `returndate`, `describ_pic_path`) VALUES (3, 17, 0, 10, '以身相许', 5, 1, 8, 0, 1, 15, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/56c4d3ca-cb1f-4cfb-9bff-64fec98e131b.jpg');
+INSERT INTO `t_return` (`id`, `projectid`, `type`, `supportmoney`, `content`, `count`, `signalpurchase`, `purchase`, `freight`, `invoice`, `returndate`, `describ_pic_path`) VALUES (4, 18, 0, 10, '以身相许', 5, 1, 8, 0, 1, 15, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/56c4d3ca-cb1f-4cfb-9bff-64fec98e131b.jpg');
+INSERT INTO `t_return` (`id`, `projectid`, `type`, `supportmoney`, `content`, `count`, `signalpurchase`, `purchase`, `freight`, `invoice`, `returndate`, `describ_pic_path`) VALUES (5, 19, 0, 10, '以身相许', 5, 1, 8, 0, 1, 15, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/56c4d3ca-cb1f-4cfb-9bff-64fec98e131b.jpg');
+INSERT INTO `t_return` (`id`, `projectid`, `type`, `supportmoney`, `content`, `count`, `signalpurchase`, `purchase`, `freight`, `invoice`, `returndate`, `describ_pic_path`) VALUES (6, 20, 1, 10, '以身相许', 5, 1, 8, 0, 1, 15, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/56c4d3ca-cb1f-4cfb-9bff-64fec98e131b.jpg');
+COMMIT;
+
+-- ----------------------------
+-- Table structure for t_role
+-- ----------------------------
+DROP TABLE IF EXISTS `t_role`;
+CREATE TABLE `t_role` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '角色 ID',
+  `name` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8;
+
+-- ----------------------------
+-- Records of t_role
+-- ----------------------------
+BEGIN;
+INSERT INTO `t_role` (`id`, `name`) VALUES (1, '经理');
+INSERT INTO `t_role` (`id`, `name`) VALUES (2, '部长');
+INSERT INTO `t_role` (`id`, `name`) VALUES (3, '经理操作者');
+INSERT INTO `t_role` (`id`, `name`) VALUES (4, '部长操作者');
+INSERT INTO `t_role` (`id`, `name`) VALUES (5, 'Admin');
+COMMIT;
+
+-- ----------------------------
+-- Table structure for t_tag
+-- ----------------------------
+DROP TABLE IF EXISTS `t_tag`;
+CREATE TABLE `t_tag` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `pid` int(11) DEFAULT NULL,
+  `name` varchar(255) DEFAULT NULL COMMENT '标签名称',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8 COMMENT='标签表';
+
+-- ----------------------------
+-- Records of t_tag
+-- ----------------------------
+BEGIN;
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (1, NULL, '手机');
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (2, NULL, '数码');
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (3, NULL, '电脑');
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (4, 1, '大屏');
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (5, 1, '美颜');
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (6, 1, '续航');
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (7, 2, '高解析度');
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (8, 2, '高清');
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (9, 3, '大内存');
+INSERT INTO `t_tag` (`id`, `pid`, `name`) VALUES (10, 3, '固态');
+COMMIT;
+
+-- ----------------------------
+-- Table structure for t_type
+-- ----------------------------
+DROP TABLE IF EXISTS `t_type`;
+CREATE TABLE `t_type` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) DEFAULT NULL COMMENT '分类名称',
+  `remark` varchar(255) DEFAULT NULL COMMENT '分类说明',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8 COMMENT='分类表';
+
+-- ----------------------------
+-- Records of t_type
+-- ----------------------------
+BEGIN;
+INSERT INTO `t_type` (`id`, `name`, `remark`) VALUES (1, '科技', '开启科技未来');
+INSERT INTO `t_type` (`id`, `name`, `remark`) VALUES (2, '设计', '创建改变未来');
+INSERT INTO `t_type` (`id`, `name`, `remark`) VALUES (3, '公益', '汇集点点爱心');
+INSERT INTO `t_type` (`id`, `name`, `remark`) VALUES (4, '农业', '网络天下肥美');
+COMMIT;
+
+SET FOREIGN_KEY_CHECKS = 1;
+```
+
+
+
+### 1.4 代码
+
+![img](https://cdn.nlark.com/yuque/0/2022/jpeg/12811585/1662176485334-62e21d4d-9c93-4d28-97af-0ae006c0c9cf.jpeg)
+
+#### 1.4.1 新建 `PortalTypeVO` 实体类【`entity` 工程】
+
+```java
+package com.atguigu.crowd.entity.vo;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.List;
+
+/**
+ * 首页展示数据
+ *
+ * @author 陈江林
+ * @date 2022/9/3 20:10
+ */
+@AllArgsConstructor
+@NoArgsConstructor
+@Data
+public class PortalTypeVO {
+
+    private Integer id;
+
+    /**
+     * 分类名称
+     */
+    private String name;
+
+    /**
+     * 分类说明
+     */
+    private String remark;
+
+    /**
+     * 首页展示数据-分类中的项目信息
+     */
+    private List<PortalProjectVO> portalProjectVO;
+
+}
+```
+
+
+
+#### 1.4.2 新建 `PortalProjectVO` 实体类【`entity` 工程】
+
+```java
+package com.atguigu.crowd.entity.vo;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * 首页展示数据-分类中的项目信息
+ *
+ * @author 陈江林
+ * @date 2022/9/3 20:11
+ */
+@AllArgsConstructor
+@NoArgsConstructor
+@Data
+public class PortalProjectVO {
+
+    private Integer projectId;
+
+    /**
+     * 项目名称
+     */
+    private String projectName;
+
+    /**
+     * 头图路径
+     */
+    private String headerPicturePath;
+
+    /**
+     * 筹集金额
+     */
+    private Integer money;
+
+    /**
+     * 项目发起时间
+     */
+    private String deployDate;
+
+    /**
+     * 已筹集到的金额/筹集金额 百分比
+     */
+    private String percentage;
+
+    /**
+     * 支持人数
+     */
+    private Integer supporter;
+
+}
+```
+
+
+
+#### 1.4.3  暴露数据查询的接口【`mysql` 工程】
+
+- `ProjectPOMapper.xml` 中编写查询数据的 SQL 语句
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662208001634-ae6cf459-d1ff-482b-9fb2-89654506e57c.png)
+
+```xml
+    <!-- 首页数据 start -->
+    <select id="selectPortalTypeVOList" resultMap="LoadPortalProjectListResultMap">
+        select id, name, remark
+        from t_type
+    </select>
+
+    <resultMap type="com.atguigu.crowd.entity.vo.PortalTypeVO" id="LoadPortalProjectListResultMap">
+        <!-- 分类数据的常规属性 -->
+        <id column="id" property="id"/>
+        <id column="name" property="name"/>
+        <id column="remark" property="remark"/>
+
+        <!-- 分类数据中包含的项目数据的 List -->
+        <!-- property 属性: 对应 PortalTypeVO 中分类数据中项目数据的 List 属性 -->
+        <!-- column 属性: 接下来查询项目时需要用到的分类 id, 就是通过 column 属性把值传入 -->
+        <!-- ofType 属性: 项目数据的实体类型 PortalProjectVO -->
+        <collection
+                property="portalProjectVO"
+                column="id"
+                ofType="com.atguigu.crowd.entity.vo.PortalProjectVO"
+                select="com.atguigu.crowd.mapper.ProjectPOMapper.selectPortalProjectVOList"
+        >
+        </collection>
+    </resultMap>
+
+    <select id="selectPortalProjectVOList" resultType="com.atguigu.crowd.entity.vo.PortalProjectVO">
+        SELECT t_project.id                         projectId,
+               project_name                         projectName,
+               header_picture_path                  headerPicturePath,
+               money,
+               deploydate                           deployDate,
+               supportmoney / t_project.money * 100 percentage,
+               supporter
+        FROM t_project
+                 LEFT JOIN t_project_type ON t_project.id = t_project_type.projectid
+        WHERE t_project_type.typeid = #{id}
+        ORDER BY t_project.id DESC
+        LIMIT 0,4
+    </select>
+    <!-- 首页数据 end -->
+```
+
+
+
+- 在 `ProjectPOMapper` 接口中声明查询数据的方法
+
+```java
+    /**
+     * 查询首页数据
+     * 
+     * @return
+     */
+    List<PortalTypeVO> selectPortalTypeVOList();
+```
+
+
+
+- 测试
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662208785344-d0c14f89-795c-49f3-bf73-e22a5ce4270a.png)
+
+```java
+    @Autowired
+    private ProjectPOMapper projectPOMapper;
+
+	/**
+     * 测试首页数据
+     */
+    @Test
+    public void testPortData() {
+        List<PortalTypeVO> typeVOList = projectPOMapper.selectPortalTypeVOList();
+        typeVOList.forEach(portalTypeVO -> {
+            String name = portalTypeVO.getName();
+            String remark = portalTypeVO.getRemark();
+            logger.info("name = " + name + " remark = " + remark);
+
+            List<PortalProjectVO> portalProjectVOList = portalTypeVO.getPortalProjectVO();
+            portalProjectVOList.forEach(portalProjectVO -> {
+                logger.info(portalProjectVO.toString());
+            });
+        });
+    }
+```
+
+
+
+- 在 `ProjectService` 中调用 `Mapper` 方法, 拿到数据
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662208933835-f945684c-4106-46f3-ae7f-7ff61007b375.png)
+
+```java
+    /**
+     * 查询首页数据
+     * 
+     * @return
+     */
+    List<PortalTypeVO> getPortalTypeVO();
+```
+
+- `ProjectServiceImpl`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662208945520-8b10835b-0cec-4bc6-832b-a79294ff9638.png)
+
+```java
+    @Override
+    public List<PortalTypeVO> getPortalTypeVO() {
+        return projectPOMapper.selectPortalTypeVOList();
+    }
+```
+
+
+
+- 在 `ProjectHandler` 中调用 `Service` 方法拿到数据
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662208957489-7ed49363-95d9-4d8e-b4ca-ca60395a5e3e.png)
+
+```java
+    @RequestMapping("/get/portal/type/project/data/remote")
+    public ResultEntity<List<PortalTypeVO>> getPortalTypeProjectDataRemote() {
+
+        try {
+            List<PortalTypeVO> portalTypeVOList = projectService.getPortalTypeVO();
+            return ResultEntity.successWithData(portalTypeVOList);
+        } catch (Exception e) {
+            return ResultEntity.failed(e.getMessage());
+        }
+
+    }
+```
+
+
+
+#### 1.4.4 声明一个 Feign 的接口 【`api` 工程】
+
+```java
+    /**
+     * 查询首页数据
+     * 
+     * @return
+     */
+    @RequestMapping("/get/portal/type/project/data/remote")
+    ResultEntity<List<PortalTypeVO>> getPortalTypeProjectDataRemote();
+```
+
+
+
+#### 1.4.5 调用 `mysql` 暴露的接口拿到数据存入到模型 【`auth` 工程】
+
+```java
+package com.atguigu.crowd.handler;
+
+import com.atguigu.crowd.api.MySQLRemoteService;
+import com.atguigu.crowd.constant.CrowdConstant;
+import com.atguigu.crowd.entity.vo.PortalTypeVO;
+import com.atguigu.crowd.util.ResultEntity;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+import java.util.List;
+
+/**
+ * @author 陈江林
+ * @date 2022/8/28 22:14
+ */
+@Controller
+public class PortalHandler {
+
+    @Autowired
+    private MySQLRemoteService mySQLRemoteService;
+
+    /**
+     * 显示首页
+     *
+     * @return
+     */
+    @RequestMapping("/")
+    public String toPortalPage(Model model) {
+        // 查询首页要显示的数据
+        ResultEntity<List<PortalTypeVO>> resultEntity = mySQLRemoteService.getPortalTypeProjectDataRemote();
+
+        // 检查查询结果
+        String result = resultEntity.getResult();
+        if(ResultEntity.SUCCESS.equals(result)) {
+            // 获取查询结果数据
+            List<PortalTypeVO> list = resultEntity.getData();
+
+            // 存入模型中
+            // ATTR_NAME_PORTAL_DATA = portal_data
+            model.addAttribute(CrowdConstant.ATTR_NAME_PORTAL_DATA, list);
+        }
+
+        return "portal";
+    }
+
+}
+```
+
+
+
+#### 1.4.6 在 `portal.html` 中显示模型中的数据【`auth` 工程】
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="https://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <base th:href="@{/}">
+    <link rel="stylesheet" href="bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/font-awesome.min.css">
+    <link rel="stylesheet" href="css/carousel.css">
+    <script src="jquery/jquery-2.1.1.min.js"></script>
+    <script src="bootstrap/js/bootstrap.min.js"></script>
+    <script src="script/docs.min.js"></script>
+    <script src="script/back-to-top.js"></script>
+    <script>
+        $(function () {
+            $(".thumbnail img").css("cursor", "pointer");
+            $(".thumbnail img").click(function () {
+                window.location.href = "project.html";
+            });
+        })
+    </script>
+    <style>
+        h3 {
+            font-weight: bold;
+        }
+
+        #footer {
+            padding: 15px 0;
+            background: #fff;
+            border-top: 1px solid #ddd;
+            text-align: center;
+        }
+
+        #topcontrol {
+            color: #fff;
+            z-index: 99;
+            width: 30px;
+            height: 30px;
+            font-size: 20px;
+            background: #222;
+            position: relative;
+            right: 14px !important;
+            bottom: 11px !important;
+            border-radius: 3px !important;
+        }
+
+        #topcontrol:after {
+            /*top: -2px;*/
+            left: 8.5px;
+            content: "\f106";
+            position: absolute;
+            text-align: center;
+            font-family: FontAwesome;
+        }
+
+        #topcontrol:hover {
+            color: #fff;
+            background: #18ba9b;
+            -webkit-transition: all 0.3s ease-in-out;
+            -moz-transition: all 0.3s ease-in-out;
+            -o-transition: all 0.3s ease-in-out;
+            transition: all 0.3s ease-in-out;
+        }
+
+        /* 侧栏导航 */
+        .sideBox {
+            padding: 10px;
+            height: 220px;
+            background: #fff;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+
+        .sideBox .hd {
+            height: 30px;
+            line-height: 30px;
+            background: #f60;
+            padding: 0 10px;
+            text-align: center;
+            overflow: hidden;
+        }
+
+        .sideBox .hd .more {
+            color: #fff;
+        }
+
+        .sideBox .hd h3 span {
+            font-weight: bold;
+            font-size: 14px;
+            color: #fff;
+        }
+
+        .sideBox .bd {
+            padding: 5px 0 0;
+        }
+
+        #sideMenu .bd li {
+            margin-bottom: 2px;
+            height: 30px;
+            line-height: 30px;
+            text-align: center;
+            overflow: hidden;
+        }
+
+        #sideMenu .bd li a {
+            display: block;
+            background: #EAE6DD;
+        }
+
+        #sideMenu .bd li a:hover {
+            background: #D5CFBF;
+        }
+
+        /* 列表页 */
+        #mainBox {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #fff;
+            overflow: hidden;
+        }
+
+        #mainBox .mHd {
+            border-bottom: 2px solid #09c;
+            height: 30px;
+            line-height: 30px;
+        }
+
+        #mainBox .mHd h3 {
+            display: initial;
+            *display: inline;
+            zoom: 1;
+            padding: 0 15px;
+            background: #09c;
+            color: #fff;
+        }
+
+        #mainBox .mHd h3 span {
+            color: #fff;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        #mainBox .path {
+            float: right;
+        }
+
+        /* 位置导航 */
+        .path {
+            height: 30px;
+            line-height: 30px;
+            padding-left: 10px;
+        }
+
+        .path a, .path span {
+            margin: 0 5px;
+        }
+
+        /* 文章列表 */
+        .newsList {
+            padding: 10px;
+            text-align: left;
+        }
+
+        .newsList li {
+            background: url("../images/share/point.png") no-repeat 2px 14px;
+            padding-left: 10px;
+            height: 30px;
+            line-height: 30px;
+        }
+
+        .newsList li a {
+            display: inline-block;
+            *display: inline;
+            zoom: 1;
+            font-size: 14px;
+        }
+
+        .newsList li .date {
+            float: right;
+            color: #999;
+        }
+
+        .newsList li.split {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px dotted #ddd;
+            height: 0px;
+            line-height: 0px;
+            overflow: hidden;
+        }
+
+        /* 通用带图片的信息列表_普通式 */
+        .picList {
+            padding: 10px;
+            text-align: left;
+        }
+
+        .picList li {
+            margin: 0 5px;
+            height: 190px;
+        }
+
+        h3.break {
+            font-size: 16px;
+            display: block;
+            white-space: nowrap;
+            word-wrap: normal;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        h3.break > a {
+            text-decoration: none;
+        }
+
+    </style>
+</head>
+<body>
+<div class="navbar-wrapper">
+    <div class="container">
+        <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+            <div class="container">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="index.html" style="font-size:32px;">尚筹网-创意产品众筹平台</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse" style="float:right;">
+                    <ul class="nav navbar-nav navbar-right">
+                        <!--                        <li><a href="login.html">登录</a></li>-->
+                        <!--                        <li><a href="reg.html">注册</a></li>-->
+                        <li><a th:href="@{/auth/member/to/login/page}">登录</a></li>
+                        <li><a th:href="@{/auth/member/to/reg/page}">注册</a></li>
+                        <li><a>|</a></li>
+                        <li><a href="admin-login.html">管理员入口</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </div>
+</div>
+
+
+<!-- Carousel
+================================================== -->
+<div id="myCarousel" class="carousel slide" data-ride="carousel">
+    <!-- Indicators -->
+    <ol class="carousel-indicators">
+        <li data-target="#myCarousel" data-slide-to="0" class="active"></li>
+        <li data-target="#myCarousel" data-slide-to="1"></li>
+        <li data-target="#myCarousel" data-slide-to="2"></li>
+    </ol>
+    <div class="carousel-inner" role="listbox">
+        <div class="item active" onclick="window.location.href='project.html'" style="cursor:pointer;">
+            <img src="img/carousel-1.jpg" alt="First slide">
+        </div>
+        <div class="item" onclick="window.location.href='project.html'" style="cursor:pointer;">
+            <img src="img/carousel-2.jpg" alt="Second slide">
+        </div>
+        <div class="item" onclick="window.location.href='project.html'" style="cursor:pointer;">
+            <img src="img/carousel-3.jpg" alt="Third slide">
+        </div>
+    </div>
+    <a class="left carousel-control" href="#myCarousel" role="button" data-slide="prev">
+        <span class="glyphicon glyphicon-chevron-left"></span>
+        <span class="sr-only">Previous</span>
+    </a>
+    <a class="right carousel-control" href="#myCarousel" role="button" data-slide="next">
+        <span class="glyphicon glyphicon-chevron-right"></span>
+        <span class="sr-only">Next</span>
+    </a>
+</div><!-- /.carousel -->
+
+
+<!-- Marketing messaging and featurettes
+================================================== -->
+<!-- Wrap the rest of the page in another container to center all the content. -->
+
+<div class="container marketing">
+
+    <!-- Three columns of text below the carousel -->
+    <div class="row">
+        <div class="col-lg-4">
+            <img class="img-circle" src="img/p1.jpg" alt="Generic placeholder image"
+                 style="width: 140px; height: 140px;">
+            <h2>智能高清监控机器人</h2>
+            <p>可爱的造型，摄像安防远程互联的全能设计，让你随时随地守护您的家人，陪伴你的生活。</p>
+            <p><a class="btn btn-default" href="project.html" role="button">项目详情 &raquo;</a></p>
+        </div><!-- /.col-lg-4 -->
+        <div class="col-lg-4">
+            <img class="img-circle" src="img/p2.jpg" alt="Generic placeholder image"
+                 style="width: 140px; height: 140px;">
+            <h2>NEOKA智能手环</h2>
+            <p>要运动更要安全，这款、名为“蝶舞”的NEOKA-V9100智能运动手环为“安全运动而生”。</p>
+            <p><a class="btn btn-default" href="project.html" role="button">项目详情 &raquo;</a></p>
+        </div><!-- /.col-lg-4 -->
+        <div class="col-lg-4">
+            <img class="img-circle" src="img/p3.png" alt="Generic placeholder image"
+                 style="width: 140px; height: 140px;">
+            <h2>驱蚊扣</h2>
+            <p>随处使用的驱蚊纽扣，<br>解决夏季蚊虫问题。</p>
+            <p><a class="btn btn-default" href="project.html" role="button">项目详情 &raquo;</a></p>
+        </div><!-- /.col-lg-4 -->
+    </div><!-- /.row -->
+
+    <div th:if="${#lists.isEmpty(portal_data)}">该分类下还没有任何的项目</div>
+    <div th:unless="${#lists.isEmpty(portal_data)}">
+        <div th:each="type : ${portal_data}" class="container">
+            <div class="row clearfix">
+                <div class="col-md-12 column">
+                    <div class="box ui-draggable">
+                        <div class="mHd" style="">
+                            <div class="path">
+                                <a href="projects.html">更多...</a>
+                            </div>
+                            <h3>
+                                <label th:text="${type.name}">科技</label>
+                                <small th:text="${type.remark}" style="color:#FFF;">开启智慧未来</small>
+                            </h3>
+                        </div>
+                        <div class="mBd" style="padding-top:10px;">
+                            <div class="row">
+                                <div th:if="${#lists.isEmpty(type.portalProjectVO)}">该分类下还没有任何的项目</div>
+                                <div th:unless="${#lists.isEmpty(type.portalProjectVO)}">
+                                    <div th:each="project : ${type.portalProjectVO}" class="col-md-3">
+                                        <div class="thumbnail">
+                                            <img alt="300x200" th:src="${project.headerPicturePath}"
+                                                 src="img/product-1.jpg"/>
+                                            <div class="caption">
+                                                <h3 class="break">
+                                                    <!--                                                    <a th:href="@{'/portal/show/project/detail/'+${project.projectId}}"-->
+                                                    <a th:href="@{/portal/show/project/detail/{projectId}(projectId=${project.projectId})}"
+                                                       th:text="${project.projectName}">活性富氢净水直饮机</a>
+                                                </h3>
+                                                <p>
+                                                <div style="float:left;">
+                                                    <i class="glyphicon glyphicon-screenshot" title="目标金额"></i>
+                                                    $<span th:text="${project.money}">20,000</span>
+                                                </div>
+                                                <div style="float:right;">
+                                                    <i title="截至日期" class="glyphicon glyphicon-calendar"></i>
+                                                    <span th:text="${project.deployDate}">2017-20-20</span>
+                                                </div>
+                                                </p>
+                                                <br>
+                                                <div class="progress" style="margin-bottom: 4px;">
+                                                    <div class="progress-bar progress-bar-success" role="progressbar"
+                                                         th:aria-valuenow="${project.percentage}" aria-valuemin="0"
+                                                         aria-valuemax="100"
+                                                         th:style="'width: ' + ${project.percentage} + '%'">
+                                                        <span th:text="${project.percentage} + '%'">40%</span>
+                                                    </div>
+                                                </div>
+                                                <div><span style="float:right;">
+                                                    <i class="glyphicon glyphicon-star-empty"></i>
+                                                </span>
+                                                    <span>
+                                                        <i class="glyphicon glyphicon-user" title="支持人数"></i>
+                                                    <span th:text="${project.supporter}">12345</span>
+                                                </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- FOOTER -->
+    <div class="container">
+        <div class="row clearfix">
+            <div class="col-md-12 column">
+                <div id="footer">
+                    <div class="footerNav">
+                        <a rel="nofollow" href="http://www.atguigu.com">关于我们</a> | <a rel="nofollow"
+                                                                                      href="http://www.atguigu.com">服务条款</a>
+                        | <a rel="nofollow" href="http://www.atguigu.com">免责声明</a> | <a rel="nofollow"
+                                                                                        href="http://www.atguigu.com">网站地图</a>
+                        | <a rel="nofollow" href="http://www.atguigu.com">联系我们</a>
+                    </div>
+                    <div class="copyRight">
+                        Copyright ?2017-2017atguigu.com 版权所有
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+</div><!-- /.container -->
+</body>
+</html>
+```
+
+
+
+## 2. 显示项目详情
+
+### 2.1 目标
+
+- 在首页点击项目名称跳转显示项目详情信息
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662398003558-d70971de-47a7-4c79-adec-f44893069965.png)
+
+
+
+### 2.2 思路
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662288003965-54f5ca25-780e-496e-b189-5e610e94aafa.png)
+
+
+
+### 2.3 代码
+
+![img](https://cdn.nlark.com/yuque/0/2022/jpeg/12811585/1662400650709-e17e108b-5698-45c0-9db8-002c9b01ad6f.jpeg)
+
+
+
+#### 2.3.1 创建 `DetailProjectVO`实体类【`entity` 工程】
+
+```java
+package com.atguigu.crowd.entity.vo;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.io.Serializable;
+import java.util.List;
+
+/**
+ * 项目数据:
+ * - 首页 > 项目详情页面 {项目数据: [回报数据]}
+ *
+ * @author 陈江林
+ * @date 2022/9/4 21:52
+ */
+@NoArgsConstructor
+@AllArgsConstructor
+@Data
+public class DetailProjectVO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * 项目主键
+     */
+    private Integer projectId;
+
+    /**
+     * 项目名称
+     */
+    private String projectName;
+
+    /**
+     * 项目简介
+     */
+    private String projectDesc;
+
+    /**
+     * 多少人关注
+     */
+    private Integer followerCount;
+
+    /**
+     * 筹集天数
+     */
+    private Integer day;
+
+    /**
+     * [{0: 审核中}, {1: 众筹中}, {2: 众筹成功}, {3: 众筹失败}]
+     */
+    private Integer status;
+
+    /**
+     * 对应 status 对象值
+     */
+    private String statusText;
+
+    /**
+     * 筹集多少钱
+     */
+    private Integer money;
+
+    /**
+     * 已经筹集多少钱
+     */
+    private Integer supportMoney;
+
+    /**
+     * 筹集百分比
+     */
+    private Integer percentage;
+
+    /**
+     * 项目发起时间
+     */
+    private String deployDate;
+
+    /**
+     * 还剩多少天
+     */
+    private Integer lastDay;
+
+    /**
+     * 有多少人支持
+     */
+    private Integer supporterCount;
+
+    /**
+     * 头图路径
+     */
+    private String headerPicturePath;
+
+    /**
+     * 详情图片路径
+     */
+    private List<String> detailPicturePathList;
+
+    /**
+     * 回报信息
+     */
+    private List<DetailReturnVO> detailReturnVOList;
+
+}
+```
+
+
+
+#### 2.3.2 创建 `DetailReturnVO`实体类【`entity` 工程】
+
+```java
+package com.atguigu.crowd.entity.vo;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.io.Serializable;
+
+/**
+ * 回报数据:
+ * - 首页 > 项目详情页面 {项目数据: [回报数据]}
+ *
+ * @author 陈江林
+ * @date 2022/9/4 21:47
+ */
+@NoArgsConstructor
+@AllArgsConstructor
+@Data
+public class DetailReturnVO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * 回报信息主键
+     */
+    private Integer returnId;
+
+    /**
+     * 当前档位需支持的金额
+     */
+    private Integer supportMoney;
+
+    /**
+     * 单笔限购, [{0: 无限额}, {1, 有限额}]
+     */
+    private Integer signalPurchase;
+
+    /**
+     * 具体限额数量
+     */
+    private Integer purchase;
+
+    /**
+     * 当前该档位支持者数量
+     */
+    private Integer supporterCount;
+
+    /**
+     * 运费, 取值为0时包邮
+     */
+    private Integer freight;
+
+    /**
+     * 众筹成功后多少天发货
+     */
+    private Integer returnDate;
+
+    /**
+     * 回报内容
+     */
+    private String content;
+
+}
+```
+
+
+
+#### 2.3.3 暴露数据查询的接口【`mysql` 工程】
+
+- `ProjectPOMapper.xml` 中编写查询数据的 SQL 语句
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662302982594-eec98638-41f4-44cd-8af8-8359e992fb31.png)
+
+```xml
+    <!-- 首页 > 项目详情页面数据 start -->
+    <!--
+        create table t_project
+        (
+            id                  int auto_increment primary key,
+            project_name        varchar(255) null comment '项目名称',
+            project_description varchar(255) null comment '项目描述',
+            money               bigint(11)   null comment '筹集金额',
+            day                 int          null comment '筹集天数',
+            status              int(4)       null comment '[{0: 审核中}, {1: 众筹中}, {2: 众筹成功}, {3: 众筹失败}]',
+            deploydate          varchar(255) null comment '项目发起时间',
+            supportmoney        bigint(11)   null comment '已筹集到的金额',
+            supporter           int          null comment '支持人数',
+            completion          int(3)       null comment '百分比完成度',
+            memberid            int          null comment '发起人的会员标识',
+            createdate          varchar(19)  null comment '项目创建时间',
+            follower            int          null comment '关注人数',
+            header_picture_path varchar(255) null comment '头图路径'
+        ) comment '项目表';
+     -->
+    <select id="selectDetailProjectVO" resultMap="loadPortalProjectListResultMap">
+        select id ,
+        project_name ,
+        project_description ,
+        money ,
+               day,
+        status ,
+        deploydate ,
+        supportmoney ,
+        supporter ,
+        supportmoney/money*100 percentage,
+        follower ,
+        header_picture_path
+        <!--List<String> detailPicturePathList-->
+        <!-- List<DetailReturnVO> detailReturnVOList-->
+        from t_project where id = #{id}
+    </select>
+
+    <resultMap id="loadPortalProjectListResultMap" type="com.atguigu.crowd.entity.vo.DetailProjectVO">
+        <id column="id" property="projectId"/>
+        <result column="project_name" property="projectName"/>
+        <result column="project_description" property="projectDesc"/>
+        <result column="money" property="money"/>
+        <result column="day" property="day"/>
+        <result column="status" property="status"/>
+        <result column="deploydate" property="deployDate"/>
+        <result column="supportmoney" property="supportMoney"/>
+        <result column="supporter" property="supporterCount"/>
+        <result column="percentage" property="percentage"/>
+        <result column="follower" property="followerCount"/>
+        <result column="header_picture_path" property="headerPicturePath"/>
+        <collection property="detailPicturePathList" select="com.atguigu.crowd.mapper.ProjectPOMapper.selectDetailPicturePathList"
+                    column="id"/>
+        <collection property="detailReturnVOList" select="com.atguigu.crowd.mapper.ProjectPOMapper.selectDetailReturnVOList"
+                    column="id"/>
+    </resultMap>
+
+    <!-- 首页 > 项目详情中 > 详情图片 -->
+    <select id="selectDetailPicturePathList" resultType="string">
+        select item_pic_path
+        from t_project_item_pic
+        where projectid = #{id}
+    </select>
+
+    <!-- 首页 > 项目详情中 > 回报数据 -->
+    <!--
+        create table t_return
+        (
+            id               int auto_increment primary key,
+            projectid        int          null comment 't_projcet 项目标识',
+            type             int(4)       null comment '[{0: 实物回报}, {1: 虚拟物品回报}]',
+            supportmoney     int          null comment '支持金额',
+            content          varchar(255) null comment '回报内容',
+            count            int          null comment '回报产品限额 {0: 不限额回报数量}',
+            signalpurchase   int          null comment '是否设置单笔限购  [{0: 无限额}, {1, 有限额}]',
+            purchase         int          null comment '具体限购数量',
+            freight          int          null comment '运费 {0: 包邮}',
+            invoice          int(4)       null comment '[{0: 不开发票}, {1: 开发票}]',
+            returndate       int          null comment '项目结束后多少天向支持者发送回报',
+            describ_pic_path varchar(255) null comment '说明图片路径'
+        ) comment '回报信息表';
+    -->
+    <select id="selectDetailReturnVOList" resultType="com.atguigu.crowd.entity.vo.DetailReturnVO">
+        select id             returnId,
+               supportmoney   supportMoney,
+               content,
+               signalpurchase signalPurchase,
+               purchase,
+               freight,
+               returndate     returnDate
+        from t_return
+        where projectid = #{id}
+    </select>
+    <!-- 首页 > 项目详情页面数据 end -->
+```
+
+- 在 `ProjectPOMapper` 接口中声明查询数据的方法
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662303219782-c27506a9-40e2-4051-9706-8163d3598446.png)
+
+```java
+    /**
+     * 查询首页 > 项目详情页面数据
+     *
+     * @param projectId
+     * @return
+     */
+    DetailProjectVO selectDetailProjectVO(Integer projectId);
+
+    /**
+     * 首页 > 项目详情中 > 详情图片
+     *
+     * @param projectId
+     * @return
+     */
+    List<String> selectDetailPicturePathList(Integer projectId);
+
+    /**
+     * 首页 > 项目详情中 > 回报数据
+     *
+     * @param projectId
+     * @return
+     */
+    List<DetailReturnVO> selectDetailReturnVOList(Integer projectId);
+```
+
+- 测试
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662208785344-d0c14f89-795c-49f3-bf73-e22a5ce4270a.png)
+
+```java
+    /**
+     * 测试 首页 > 项目详情页面 数据
+     */
+    @Test
+    public void testSelectDetailProjectVO() {
+        DetailProjectVO detailProjectVO = projectPOMapper.selectDetailProjectVO(20);
+        logger.info(detailProjectVO.getProjectId() + "");
+        logger.info(detailProjectVO.getProjectName() + "");
+        logger.info(detailProjectVO.getProjectDesc() + "");
+        logger.info(detailProjectVO.getFollowerCount() + "");
+        logger.info(detailProjectVO.getStatus() + "");
+        logger.info(detailProjectVO.getMoney() + "");
+        logger.info(detailProjectVO.getSupportMoney() + "");
+        logger.info(detailProjectVO.getPercentage() + "");
+        logger.info(detailProjectVO.getDeployDate() + "");
+        logger.info(detailProjectVO.getLastDay() + "");
+        logger.info(detailProjectVO.getSupporterCount() + "");
+        logger.info(detailProjectVO.getHeaderPicturePath() + "");
+
+        detailProjectVO.getDetailPicturePathList().forEach(detailPicturePath -> logger.info("详情图片路径: " + detailPicturePath));
+        detailProjectVO.getDetailReturnVOList().forEach(detailReturnVO -> {
+            logger.info("" + detailReturnVO.getReturnId());
+            logger.info("" + detailReturnVO.getSupportMoney());
+            logger.info("" + detailReturnVO.getSignalPurchase());
+            logger.info("" + detailReturnVO.getPurchase());
+            logger.info("" + detailReturnVO.getSupporterCount());
+            logger.info("" + detailReturnVO.getFreight());
+            logger.info("" + detailReturnVO.getReturnDate());
+            logger.info("" + detailReturnVO.getContent());
+        });
+    }
+```
+
+- 在 `ProjectService` 中调用 `Mapper` 方法, 拿到数据
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662208933835-f945684c-4106-46f3-ae7f-7ff61007b375.png)
+
+```java
+    /**
+     * 查询首页 > 项目详情页面数据
+     *
+     * @param projectId
+     * @return
+     */
+    DetailProjectVO getDetailProjectVO(Integer projectId);
+```
+
+- `ProjectServiceImpl`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662208945520-8b10835b-0cec-4bc6-832b-a79294ff9638.png)
+
+```java
+    @Override
+    public DetailProjectVO getDetailProjectVO(Integer projectId) {
+        // 查询得到 DetailProjectVO 对象
+        DetailProjectVO detailProjectVO = projectPOMapper.selectDetailProjectVO(projectId);
+        // 根据 status 确定 statusText
+        Integer status = detailProjectVO.getStatus();
+        switch (status) {
+            case 0:
+                detailProjectVO.setStatusText("审核中");
+                break;
+            case 1:
+                detailProjectVO.setStatusText("众筹中");
+                break;
+            case 2:
+                detailProjectVO.setStatusText("众筹成功");
+                break;
+            case 3:
+                detailProjectVO.setStatusText("众筹失败");
+                break;
+            default:
+                break;
+        }
+
+        // 3. 根据 deployDate 计算 lastDay
+        // 格式: xxxx-xx-xx
+        String deployDate = detailProjectVO.getDeployDate();
+
+        // 获取当前日期
+        Date currentDay = new Date();
+
+        // 把众筹日期解析成 Date 类型
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+        try {
+            Date deployDay = format.parse(deployDate);
+
+            // 获取当前日期的时间戳
+            long currentTimeStamp = currentDay.getTime();
+
+            // 获取众筹日期的时间戳
+            long deployTimeStamp = deployDay.getTime();
+
+            // 两个时间戳相减计算当前已经过去的时间
+            long pastDays = (currentTimeStamp - deployTimeStamp) / 1000 / 60 / 60 / 24;
+
+            // 获取总的众筹天数
+            Integer totalDays = detailProjectVO.getDay();
+
+            // 使用总的众筹天数减去已经过去的天数得到剩余天数
+            Integer lastDay = (int) (totalDays - pastDays);
+            detailProjectVO.setLastDay(lastDay);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return detailProjectVO;
+    }
+```
+
+
+
+- 在 `ProjectHandler` 中调用 `Service` 方法拿到数据
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662208957489-7ed49363-95d9-4d8e-b4ca-ca60395a5e3e.png)
+
+```java
+    @RequestMapping("/get/project/detail/remote/{projectId}")
+    ResultEntity<DetailProjectVO> getDetailProjectVORemote(@PathVariable("projectId") Integer projectId) {
+
+        try {
+            DetailProjectVO detailProjectVOById = projectService.getDetailProjectVO(projectId);
+            return ResultEntity.successWithData(detailProjectVOById);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResultEntity.failed(e.getMessage());
+        }
+
+    }
+```
+
+
+
+#### 2.3.4 声明一个 Feign 的接口 【`api` 工程】
+
+```java
+    /**
+     * 查询首页 > 项目详情页面数据
+     *
+     * @param projectId 项目 id
+     * @return
+     */
+    @RequestMapping("/get/project/detail/remote/{projectId}")
+    ResultEntity<DetailProjectVO> getDetailProjectVORemote(@PathVariable("projectId") Integer projectId);
+```
+
+
+
+#### 2.3.5 首页跳转到项目详情 `portal.html`【`auth` 工程】
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662400497019-db5493ae-a5cf-4643-ab68-88ee4edec8ee.png)
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662346354370-64276f32-c193-4edc-b81f-9bf1bf0baf03.png)
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <base th:href="@{/}">
+    <link rel="stylesheet" href="bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/font-awesome.min.css">
+    <link rel="stylesheet" href="css/carousel.css">
+    <script src="jquery/jquery-2.1.1.min.js"></script>
+    <script src="bootstrap/js/bootstrap.min.js"></script>
+    <script src="script/docs.min.js"></script>
+    <script src="script/back-to-top.js"></script>
+    <script>
+        $(function () {
+            $(".thumbnail img").css("cursor", "pointer");
+            $(".thumbnail img").click(function () {
+                window.location.href = "project.html";
+            });
+        })
+    </script>
+    <style>
+        h3 {
+            font-weight: bold;
+        }
+
+        #footer {
+            padding: 15px 0;
+            background: #fff;
+            border-top: 1px solid #ddd;
+            text-align: center;
+        }
+
+        #topcontrol {
+            color: #fff;
+            z-index: 99;
+            width: 30px;
+            height: 30px;
+            font-size: 20px;
+            background: #222;
+            position: relative;
+            right: 14px !important;
+            bottom: 11px !important;
+            border-radius: 3px !important;
+        }
+
+        #topcontrol:after {
+            /*top: -2px;*/
+            left: 8.5px;
+            content: "\f106";
+            position: absolute;
+            text-align: center;
+            font-family: FontAwesome;
+        }
+
+        #topcontrol:hover {
+            color: #fff;
+            background: #18ba9b;
+            -webkit-transition: all 0.3s ease-in-out;
+            -moz-transition: all 0.3s ease-in-out;
+            -o-transition: all 0.3s ease-in-out;
+            transition: all 0.3s ease-in-out;
+        }
+
+        /* 侧栏导航 */
+        .sideBox {
+            padding: 10px;
+            height: 220px;
+            background: #fff;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+
+        .sideBox .hd {
+            height: 30px;
+            line-height: 30px;
+            background: #f60;
+            padding: 0 10px;
+            text-align: center;
+            overflow: hidden;
+        }
+
+        .sideBox .hd .more {
+            color: #fff;
+        }
+
+        .sideBox .hd h3 span {
+            font-weight: bold;
+            font-size: 14px;
+            color: #fff;
+        }
+
+        .sideBox .bd {
+            padding: 5px 0 0;
+        }
+
+        #sideMenu .bd li {
+            margin-bottom: 2px;
+            height: 30px;
+            line-height: 30px;
+            text-align: center;
+            overflow: hidden;
+        }
+
+        #sideMenu .bd li a {
+            display: block;
+            background: #EAE6DD;
+        }
+
+        #sideMenu .bd li a:hover {
+            background: #D5CFBF;
+        }
+
+        /* 列表页 */
+        #mainBox {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #fff;
+            overflow: hidden;
+        }
+
+        #mainBox .mHd {
+            border-bottom: 2px solid #09c;
+            height: 30px;
+            line-height: 30px;
+        }
+
+        #mainBox .mHd h3 {
+            display: initial;
+            *display: inline;
+            zoom: 1;
+            padding: 0 15px;
+            background: #09c;
+            color: #fff;
+        }
+
+        #mainBox .mHd h3 span {
+            color: #fff;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        #mainBox .path {
+            float: right;
+        }
+
+        /* 位置导航 */
+        .path {
+            height: 30px;
+            line-height: 30px;
+            padding-left: 10px;
+        }
+
+        .path a, .path span {
+            margin: 0 5px;
+        }
+
+        /* 文章列表 */
+        .newsList {
+            padding: 10px;
+            text-align: left;
+        }
+
+        .newsList li {
+            background: url("../images/share/point.png") no-repeat 2px 14px;
+            padding-left: 10px;
+            height: 30px;
+            line-height: 30px;
+        }
+
+        .newsList li a {
+            display: inline-block;
+            *display: inline;
+            zoom: 1;
+            font-size: 14px;
+        }
+
+        .newsList li .date {
+            float: right;
+            color: #999;
+        }
+
+        .newsList li.split {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px dotted #ddd;
+            height: 0px;
+            line-height: 0px;
+            overflow: hidden;
+        }
+
+        /* 通用带图片的信息列表_普通式 */
+        .picList {
+            padding: 10px;
+            text-align: left;
+        }
+
+        .picList li {
+            margin: 0 5px;
+            height: 190px;
+        }
+
+        h3.break {
+            font-size: 16px;
+            display: block;
+            white-space: nowrap;
+            word-wrap: normal;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        h3.break > a {
+            text-decoration: none;
+        }
+
+    </style>
+</head>
+<body>
+<div class="navbar-wrapper">
+    <div class="container">
+        <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+            <div class="container">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="index.html" style="font-size:32px;">尚筹网-创意产品众筹平台</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse" style="float:right;">
+                    <ul class="nav navbar-nav navbar-right">
+                        <!--                        <li><a href="login.html">登录</a></li>-->
+                        <!--                        <li><a href="reg.html">注册</a></li>-->
+                        <li><a th:href="@{/auth/member/to/login/page}">登录</a></li>
+                        <li><a th:href="@{/auth/member/to/reg/page}">注册</a></li>
+                        <li><a>|</a></li>
+                        <li><a href="admin-login.html">管理员入口</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </div>
+</div>
+
+
+<!-- Carousel
+================================================== -->
+<div id="myCarousel" class="carousel slide" data-ride="carousel">
+    <!-- Indicators -->
+    <ol class="carousel-indicators">
+        <li data-target="#myCarousel" data-slide-to="0" class="active"></li>
+        <li data-target="#myCarousel" data-slide-to="1"></li>
+        <li data-target="#myCarousel" data-slide-to="2"></li>
+    </ol>
+    <div class="carousel-inner" role="listbox">
+        <div class="item active" onclick="window.location.href='project.html'" style="cursor:pointer;">
+            <img src="img/carousel-1.jpg" alt="First slide">
+        </div>
+        <div class="item" onclick="window.location.href='project.html'" style="cursor:pointer;">
+            <img src="img/carousel-2.jpg" alt="Second slide">
+        </div>
+        <div class="item" onclick="window.location.href='project.html'" style="cursor:pointer;">
+            <img src="img/carousel-3.jpg" alt="Third slide">
+        </div>
+    </div>
+    <a class="left carousel-control" href="#myCarousel" role="button" data-slide="prev">
+        <span class="glyphicon glyphicon-chevron-left"></span>
+        <span class="sr-only">Previous</span>
+    </a>
+    <a class="right carousel-control" href="#myCarousel" role="button" data-slide="next">
+        <span class="glyphicon glyphicon-chevron-right"></span>
+        <span class="sr-only">Next</span>
+    </a>
+</div><!-- /.carousel -->
+
+
+<!-- Marketing messaging and featurettes
+================================================== -->
+<!-- Wrap the rest of the page in another container to center all the content. -->
+
+<div class="container marketing">
+
+    <!-- Three columns of text below the carousel -->
+    <div class="row">
+        <div class="col-lg-4">
+            <img class="img-circle" src="img/p1.jpg" alt="Generic placeholder image"
+                 style="width: 140px; height: 140px;">
+            <h2>智能高清监控机器人</h2>
+            <p>可爱的造型，摄像安防远程互联的全能设计，让你随时随地守护您的家人，陪伴你的生活。</p>
+            <p><a class="btn btn-default" href="project.html" role="button">项目详情 &raquo;</a></p>
+        </div><!-- /.col-lg-4 -->
+        <div class="col-lg-4">
+            <img class="img-circle" src="img/p2.jpg" alt="Generic placeholder image"
+                 style="width: 140px; height: 140px;">
+            <h2>NEOKA智能手环</h2>
+            <p>要运动更要安全，这款、名为“蝶舞”的NEOKA-V9100智能运动手环为“安全运动而生”。</p>
+            <p><a class="btn btn-default" href="project.html" role="button">项目详情 &raquo;</a></p>
+        </div><!-- /.col-lg-4 -->
+        <div class="col-lg-4">
+            <img class="img-circle" src="img/p3.png" alt="Generic placeholder image"
+                 style="width: 140px; height: 140px;">
+            <h2>驱蚊扣</h2>
+            <p>随处使用的驱蚊纽扣，<br>解决夏季蚊虫问题。</p>
+            <p><a class="btn btn-default" href="project.html" role="button">项目详情 &raquo;</a></p>
+        </div><!-- /.col-lg-4 -->
+    </div><!-- /.row -->
+
+    <div th:if="${#lists.isEmpty(portal_data)}">该分类下还没有任何的项目</div>
+    <div th:unless="${#lists.isEmpty(portal_data)}">
+        <div th:each="type : ${portal_data}" class="container">
+            <div class="row clearfix">
+                <div class="col-md-12 column">
+                    <div class="box ui-draggable">
+                        <div class="mHd" style="">
+                            <div class="path">
+                                <a href="projects.html">更多...</a>
+                            </div>
+                            <h3>
+                                <label th:text="${type.name}">科技</label>
+                                <small th:text="${type.remark}" style="color:#FFF;">开启智慧未来</small>
+                            </h3>
+                        </div>
+                        <div class="mBd" style="padding-top:10px;">
+                            <div class="row">
+                                <div th:if="${#lists.isEmpty(type.portalProjectVO)}">该分类下还没有任何的项目</div>
+                                <div th:unless="${#lists.isEmpty(type.portalProjectVO)}">
+                                    <div th:each="project : ${type.portalProjectVO}" class="col-md-3">
+                                        <div class="thumbnail">
+                                            <img alt="300x200" th:src="${project.headerPicturePath}"
+                                                 src="img/product-1.jpg"/>
+                                            <div class="caption">
+                                                <h3 class="break">
+                                                    <!--                                                    <a th:href="@{${session.zuulPath}+'/portal/show/project/detail/'+${project.projectId}}"-->
+                                                    <a th:href="@{{zuulPath}/project/get/project/detail/{projectId}(projectId=${project.projectId}, zuulPath=${session.zuulPath})}"
+                                                       th:text="${project.projectName}">活性富氢净水直饮机</a>
+                                                </h3>
+                                                <p>
+                                                <div style="float:left;">
+                                                    <i class="glyphicon glyphicon-screenshot" title="目标金额"></i>
+                                                    $<span th:text="${project.money}">20,000</span>
+                                                </div>
+                                                <div style="float:right;">
+                                                    <i title="截至日期" class="glyphicon glyphicon-calendar"></i>
+                                                    <span th:text="${project.deployDate}">2017-20-20</span>
+                                                </div>
+                                                </p>
+                                                <br>
+                                                <div class="progress" style="margin-bottom: 4px;">
+                                                    <div class="progress-bar progress-bar-success" role="progressbar"
+                                                         th:aria-valuenow="${project.percentage}" aria-valuemin="0"
+                                                         aria-valuemax="100"
+                                                         th:style="'width: ' + ${project.percentage} + '%'">
+                                                        <span th:text="${project.percentage} + '%'">40%</span>
+                                                    </div>
+                                                </div>
+                                                <div><span style="float:right;">
+                                                    <i class="glyphicon glyphicon-star-empty"></i>
+                                                </span>
+                                                    <span>
+                                                        <i class="glyphicon glyphicon-user" title="支持人数"></i>
+                                                    <span th:text="${project.supporter}">12345</span>
+                                                </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- FOOTER -->
+    <div class="container">
+        <div class="row clearfix">
+            <div class="col-md-12 column">
+                <div id="footer">
+                    <div class="footerNav">
+                        <a rel="nofollow" href="http://www.atguigu.com">关于我们</a> | <a rel="nofollow"
+                                                                                      href="http://www.atguigu.com">服务条款</a>
+                        | <a rel="nofollow" href="http://www.atguigu.com">免责声明</a> | <a rel="nofollow"
+                                                                                        href="http://www.atguigu.com">网站地图</a>
+                        | <a rel="nofollow" href="http://www.atguigu.com">联系我们</a>
+                    </div>
+                    <div class="copyRight">
+                        Copyright ?2017-2017atguigu.com 版权所有
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+</div><!-- /.container -->
+</body>
+</html>
+```
+
+
+
+#### 2.3.6 调用 `mysql` 暴露的接口拿到数据存入到模型 【`project` 工程】
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662346333525-b2facdbf-382a-4cfc-ab43-fca139a5d46b.png)
+
+```java
+    /**
+     * 首页 > 项目详情页面
+     *
+     * @param projectId
+     * @return
+     */
+    @RequestMapping("/get/project/detail/{projectId}")
+    public String getProjectDetail(@PathVariable("projectId") Integer projectId, Model model) {
+        ResultEntity<DetailProjectVO> resultEntity = mySQLRemoteService.getDetailProjectVORemote(projectId);
+
+        if(ResultEntity.SUCCESS.equals(resultEntity.getResult())) {
+            DetailProjectVO detailProjectVO = resultEntity.getData();
+            model.addAttribute("detailProjectVO", detailProjectVO);
+        }
+
+        return "project-show-detail";
+    }
+```
+
+
+
+#### 2.3.7 新建 `project-show-detail.html` 中显示模型中的数据【`project` 工程】
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <base th:href="@{/}"/>
+    <link rel="stylesheet" href="bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/font-awesome.min.css">
+    <link rel="stylesheet" href="css/theme.css">
+    <script src="jquery/jquery-2.1.1.min.js"></script>
+    <script src="bootstrap/js/bootstrap.min.js"></script>
+    <script src="script/docs.min.js"></script>
+    <script src="script/back-to-top.js"></script>
+    <script>
+        $(function () {
+            $(".prjtip img").css("cursor", "pointer");
+            $(".prjtip img").click(function () {
+                window.location.href = 'project.html';
+            });
+        })
+    </script>
+    <style>
+        #footer {
+            padding: 15px 0;
+            background: #fff;
+            border-top: 1px solid #ddd;
+            text-align: center;
+        }
+
+        #topcontrol {
+            color: #fff;
+            z-index: 99;
+            width: 30px;
+            height: 30px;
+            font-size: 20px;
+            background: #222;
+            position: relative;
+            right: 14px !important;
+            bottom: 11px !important;
+            border-radius: 3px !important;
+        }
+
+        #topcontrol:after {
+            /*top: -2px;*/
+            left: 8.5px;
+            content: "\f106";
+            position: absolute;
+            text-align: center;
+            font-family: FontAwesome;
+        }
+
+        #topcontrol:hover {
+            color: #fff;
+            background: #18ba9b;
+            -webkit-transition: all 0.3s ease-in-out;
+            -moz-transition: all 0.3s ease-in-out;
+            -o-transition: all 0.3s ease-in-out;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .nav-tabs > li.active > a, .nav-tabs > li.active > a:focus, .nav-tabs > li.active > a:hover {
+            border-bottom-color: #ddd;
+        }
+
+        .nav-tabs > li > a {
+            border-radius: 0;
+        }
+    </style>
+</head>
+<body>
+<div class="navbar-wrapper">
+    <div class="container">
+        <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+            <div class="container">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="#" style="font-size: 32px;">尚筹网-创意产品众筹平台</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse"
+                     style="float: right;">
+                    <ul class="nav navbar-nav">
+                        <li class="dropdown"><a href="#" class="dropdown-toggle"
+                                                data-toggle="dropdown"><i class="glyphicon glyphicon-user"></i>
+                            [[${session.loginMember.username}]]<span class="caret"></span></a>
+                            <ul class="dropdown-menu" role="menu">
+                                <li><a href="member.html"><i class="glyphicon glyphicon-scale"></i> 会员中心</a></li>
+                                <li><a href="#"><i class="glyphicon glyphicon-comment"></i>
+                                    消息</a></li>
+                                <li class="divider"></li>
+                                <li><a th:href="@{/auth/member/logout}"><i
+                                        class="glyphicon glyphicon-off"></i> 退出系统</a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </div>
+</div>
+
+<div class="container theme-showcase" role="main">
+
+    <div class="container">
+        <div class="row clearfix">
+            <div class="col-md-12 column">
+                <nav class="navbar navbar-default" role="navigation">
+                    <div class="collapse navbar-collapse"
+                         id="bs-example-navbar-collapse-1">
+                        <ul class="nav navbar-nav">
+                            <li><a rel="nofollow" href="index.html"><i
+                                    class="glyphicon glyphicon-home"></i> 众筹首页</a></li>
+                            <li><a rel="nofollow" href="projects.html"><i
+                                    class="glyphicon glyphicon-th-large"></i> 众筹项目</a></li>
+                            <li><a rel="nofollow" href="start.html"><i
+                                    class="glyphicon glyphicon-edit"></i> 发起众筹</a></li>
+                            <li><a rel="nofollow" href="minecrowdfunding.html"><i
+                                    class="glyphicon glyphicon-user"></i> 我的众筹</a></li>
+                        </ul>
+                    </div>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <div th:if="${#arrays.isEmpty(detailProjectVO)}">查询项目详情信息失败！</div>
+    <div th:unless="${#arrays.isEmpty(detailProjectVO)}">
+        <div class="container">
+            <div class="row clearfix">
+                <div class="col-md-12 column">
+                    <div class="jumbotron nofollow" style="padding-top: 10px;">
+                        <h3 th:text="${detailProjectVO.projectName}">酷驰触控龙头，智享厨房黑科技</h3>
+                        <div style="float: left; width: 70%;" th:text="${detailProjectVO.projectDesc}">
+                            智能时代，酷驰触控厨房龙头，让煮妇解放双手，触发更多烹饪灵感，让美味信手拈来。
+                        </div>
+                        <div style="float: right;">
+                            <button type="button" class="btn btn-default">
+                                <i style="color: #f60" class="glyphicon glyphicon-heart"></i>
+                                关注[[${detailProjectVO.followerCount}]]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="container">
+            <div class="row clearfix">
+                <div class="col-md-12 column">
+                    <div class="row clearfix">
+                        <div class="col-md-8 column" th:if="${#lists.isEmpty(detailProjectVO.detailPicturePathList)}">
+                            加载详情信息失败
+                        </div>
+                        <div class="col-md-8 column" th:unless="${#lists.isEmpty(detailProjectVO.detailPicturePathList)}">
+                            <img alt="140x140" width="740" src="img/product_detail_head.jpg"
+                                 th:src="${detailProjectVO.headerPicturePath}"/>
+                            <img alt="140x140" width="740" src="img/product_detail_body.jpg"
+                                 th:each="detailPicturePath : ${detailProjectVO.detailPicturePathList}"
+                                 th:src="${detailPicturePath}"/>
+                        </div>
+                        <div class="col-md-4 column">
+                            <div class="panel panel-default" style="border-radius: 0px;">
+                                <div class="panel-heading"
+                                     style="background-color: #fff; border-color: #fff;">
+										<span class="label label-success"><i
+                                                class="glyphicon glyphicon-tag"></i> [[${detailProjectVO.statusText}]]</span>
+                                </div>
+                                <div class="panel-body">
+                                    <h3>已筹资金：￥[[${detailProjectVO.supportMoney}]]</h3>
+                                    <p>
+                                        <span>目标金额 ： [[${detailProjectVO.money}]]</span><span style="float: right;">达成
+												： [[${detailProjectVO.percentage}]]%</span>
+                                    </p>
+                                    <div class="progress"
+                                         style="height: 10px; margin-bottom: 5px;">
+                                        <div class="progress-bar progress-bar-success"
+                                             role="progressbar" aria-valuenow="[[${detailProjectVO.percentage}]]"
+                                             aria-valuemin="0"
+                                             aria-valuemax="100" style="width: 60%;"
+                                             th:style="'width: '+${detailProjectVO.percentage}+'%;'"></div>
+                                    </div>
+                                    <p>剩余 [[${detailProjectVO.lastDay}]] 天</p>
+                                    <div>
+                                        <p>
+                                            <span>已有[[${detailProjectVO.supporterCount}]]人支持该项目</span>
+                                        </p>
+                                        <button type="button"
+                                                class="btn  btn-warning btn-lg btn-block"
+                                                data-toggle="modal" data-target="#myModal">立即支持
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="panel-footer"
+                                     style="background-color: #fff; border-top: 1px solid #ddd; border-bottom-right-radius: 0px; border-bottom-left-radius: 0px;">
+                                    <div class="container-fluid">
+                                        <div class="row clearfix">
+                                            <div class="col-md-3 column" style="padding: 0;">
+                                                <img alt="140x140" src="img/services-box2.jpg"
+                                                     data-holder-rendered="true"
+                                                     style="width: 80px; height: 80px;">
+                                            </div>
+                                            <div class="col-md-9 column">
+                                                <div class="">
+                                                    <h4>
+                                                        <b>福建省南安厨卫</b> <span
+                                                            style="float: right; font-size: 12px;"
+                                                            class="label label-success">已认证</span>
+                                                    </h4>
+                                                    <p style="font-size: 12px">
+                                                        酷驰是一家年轻的厨卫科技公司，我们有一支朝气蓬勃，有激情、有想法、敢实践的团队。</p>
+                                                    <p style="font-size: 12px">客服电话:0595-86218855</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div th:if="${#lists.isEmpty(detailProjectVO.detailReturnVOList)}">没有加载到项目回报信息</div>
+                            <div th:unless="${#lists.isEmpty(detailProjectVO.detailReturnVOList)}">
+                                <div th:each="return : ${detailProjectVO.detailReturnVOList}"
+                                     class="panel panel-default" style="border-radius: 0px;">
+                                    <div class="panel-heading">
+                                        <h3>
+                                            ￥[[${return.supportMoney}]]
+                                            <span th:if="${return.signalPurchase == 0}"
+                                                  style="float: right; font-size: 12px;">无限额，447位支持者</span>
+                                            <span th:if="${return.signalPurchase == 1}"
+                                                  style="float: right; font-size: 12px;">限额[[${return.purchase}]]位，剩余1966位</span>
+                                        </h3>
+                                    </div>
+                                    <div class="panel-body">
+                                        <p th:if="${return.freight == 0}">配送费用：包邮</p>
+                                        <p th:if="${return.freight > 0}">配送费用：[[${return.freight}]]</p>
+                                        <p>预计发放时间：项目筹款成功后的[[${return.returnDate}]]天内</p>
+                                        <a th:href="@{{zuulPath}/order/confirm/return/info/{projectId}/{returnId}(zuulPath=${session.zuulPath}, projectId=${detailProjectVO.projectId}, returnId=${return.returnId})}"
+                                           class="btn btn-warning btn-lg">支持</a>
+                                        <br>
+                                        <br>
+                                        <p th:text="${return.content}">
+                                            感谢您的支持，在众筹开始后，您将以79元的优惠价格获得“遇见彩虹?”智能插座一件（参考价208元）。</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class=" panel panel-default" style="border-radius: 0px;">
+                                <div class="panel-heading">
+                                    <h3>风险提示</h3>
+                                </div>
+                                <div class="panel-body">
+                                    <p>
+                                        1.众筹并非商品交易，存在一定风险。支持者根据自己的判断选择、支持众筹项目，与发起人共同实现梦想并获得发起人承诺的回报。<br>
+                                        2.众筹平台仅提供平台网络空间及技术支持等中介服务，众筹仅存在于发起人和支持者之间，使用众筹平台产生的法律后果由发起人与支持者自行承担。<br>
+                                        3.本项目必须在2017-06-09之前达到￥10000.00
+                                        的目标才算成功，否则已经支持的订单将取消。订单取消或募集失败的，您支持的金额将原支付路径退回。<br>
+                                        4.请在支持项目后15分钟内付款，否则您的支持请求会被自动关闭。<br>
+                                        5.众筹成功后由发起人统一进行发货，售后服务由发起人统一提供；如果发生发起人无法发放回报、延迟发放回报、不提供回报后续服务等情况，您需要直接和发起人协商解决。<br>
+                                        6.如您不同意上述风险提示内容，您有权选择不支持；一旦选择支持，视为您已确认并同意以上提示内容。
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h2>为你推荐</h2>
+                                <hr>
+                            </div>
+                            <div class="prjtip panel panel-default"
+                                 style="border-radius: 0px;">
+                                <div class="panel-body">
+                                    <img src="img/product-3.png" width="100%" height="100%">
+                                </div>
+                            </div>
+
+                            <div class="prjtip panel panel-default"
+                                 style="border-radius: 0px;">
+                                <div class="panel-body">
+                                    <img src="img/product-4.jpg" width="100%" height="100%">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container" style="margin-top: 20px;">
+        <div class="row clearfix">
+            <div class="col-md-12 column">
+                <div id="footer">
+                    <div class="footerNav">
+                        <a rel="nofollow" href="http://www.atguigu.com">关于我们</a> | <a
+                            rel="nofollow" href="http://www.atguigu.com">服务条款</a> | <a
+                            rel="nofollow" href="http://www.atguigu.com">免责声明</a> | <a
+                            rel="nofollow" href="http://www.atguigu.com">网站地图</a> | <a
+                            rel="nofollow" href="http://www.atguigu.com">联系我们</a>
+                    </div>
+                    <div class="copyRight">Copyright ?2010-2014atguigu.com 版权所有
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+</div>
+<!-- /container -->
+
+
+<div class="modal fade" id="myModal" tabindex="-1" role="dialog"
+     aria-labelledby="myModalLabel">
+    <div class="modal-dialog " style="width: 960px; height: 400px;"
+         role="document">
+        <div class="modal-content" data-spy="scroll"
+             data-target="#myScrollspy">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal"
+                        aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                <h4 class="modal-title" id="myModalLabel">选择支持项</h4>
+            </div>
+            <div class="modal-body">
+                <div class="container-fluid">
+                    <div class="row clearfix">
+                        <div class="col-sm-3 col-md-3 column" id="myScrollspy">
+                            <ul class="nav nav-tabs nav-stacked">
+                                <li class="active"><a href="#section-1">￥1.00</a></li>
+                                <li class="active"><a href="#section-2">￥149.00</a></li>
+                                <li class="active"><a href="#section-3">￥249.00</a></li>
+                                <li class="active"><a href="#section-4">￥549.00</a></li>
+                                <li class="active"><a href="#section-5">￥1999.00</a></li>
+                            </ul>
+                        </div>
+                        <div id="navList" class="col-sm-9 col-md-9 column"
+                             style="height: 400px; overflow-y: auto;">
+                            <h2 id="section-1" style="border-bottom: 1px dashed #ddd;">
+                                <span style="font-size: 20px; font-weight: bold;">￥1.00</span><span
+                                    style="font-size: 12px; margin-left: 60px;">无限额，223位支持者</span>
+                            </h2>
+                            <p>配送费用：全国包邮</p>
+                            <p>预计发放时间：项目筹款成功后的30天内</p>
+                            <button type="button" class="btn  btn-warning btn-lg "
+                                    onclick="window.location.href='pay-step-1.html'">支持
+                            </button>
+                            <br>
+                            <br>
+                            <p>每满1750人抽取一台活性富氢净水直饮机，至少抽取一台。抽取名额（小数点后一位四舍五入）=参与人数÷1750人，由苏宁官方抽取。</p>
+                            <hr>
+                            <h2 id="section-2" style="border-bottom: 1px dashed #ddd;">
+                                <span style="font-size: 20px; font-weight: bold;">￥149.00</span><span
+                                    style="font-size: 12px; margin-left: 60px;">无限额，223位支持者</span>
+                            </h2>
+                            <p>配送费用：全国包邮</p>
+                            <p>预计发放时间：项目筹款成功后的30天内</p>
+                            <button type="button" class="btn  btn-warning btn-lg "
+                                    onclick="window.location.href='pay-step-1.html'">支持
+                            </button>
+                            <br>
+                            <br>
+                            <p>每满1750人抽取一台活性富氢净水直饮机，至少抽取一台。抽取名额（小数点后一位四舍五入）=参与人数÷1750人，由苏宁官方抽取。</p>
+                            <hr>
+                            <h2 id="section-3" style="border-bottom: 1px dashed #ddd;">
+                                <span style="font-size: 20px; font-weight: bold;">￥249.00</span><span
+                                    style="font-size: 12px; margin-left: 60px;">无限额，223位支持者</span>
+                            </h2>
+                            <p>配送费用：全国包邮</p>
+                            <p>预计发放时间：项目筹款成功后的30天内</p>
+                            <button type="button" class="btn  btn-warning btn-lg "
+                                    onclick="window.location.href='pay-step-1.html'">支持
+                            </button>
+                            <br>
+                            <br>
+                            <p>每满1750人抽取一台活性富氢净水直饮机，至少抽取一台。抽取名额（小数点后一位四舍五入）=参与人数÷1750人，由苏宁官方抽取。</p>
+                            <hr>
+                            <h2 id="section-4" style="border-bottom: 1px dashed #ddd;">
+                                <span style="font-size: 20px; font-weight: bold;">￥549.00</span><span
+                                    style="font-size: 12px; margin-left: 60px;">无限额，223位支持者</span>
+                            </h2>
+                            <p>配送费用：全国包邮</p>
+                            <p>预计发放时间：项目筹款成功后的30天内</p>
+                            <button type="button" class="btn  btn-warning btn-lg "
+                                    onclick="window.location.href='pay-step-1.html'">支持
+                            </button>
+                            <br>
+                            <br>
+                            <p>每满1750人抽取一台活性富氢净水直饮机，至少抽取一台。抽取名额（小数点后一位四舍五入）=参与人数÷1750人，由苏宁官方抽取。</p>
+                            <hr>
+                            <h2 id="section-5" style="border-bottom: 1px dashed #ddd;">
+                                <span style="font-size: 20px; font-weight: bold;">￥1999.00</span><span
+                                    style="font-size: 12px; margin-left: 60px;">无限额，223位支持者</span>
+                            </h2>
+                            <p>配送费用：全国包邮</p>
+                            <p>预计发放时间：项目筹款成功后的30天内</p>
+                            <button type="button" class="btn  btn-warning btn-lg "
+                                    onclick="window.location.href='pay-step-1.html'">支持
+                            </button>
+                            <br>
+                            <br>
+                            <p>每满1750人抽取一台活性富氢净水直饮机，至少抽取一台。抽取名额（小数点后一位四舍五入）=参与人数÷1750人，由苏宁官方抽取。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+
+</body>
+</html>
+```
+

@@ -1,5 +1,6 @@
 package com.atguigu.crowd.service.api;
 
+import com.atguigu.crowd.entity.vo.DetailProjectVO;
 import com.atguigu.crowd.entity.vo.PortalTypeVO;
 import com.atguigu.crowd.entity.vo.ProjectVO;
 
@@ -26,5 +27,13 @@ public interface ProjectService {
      * @return
      */
     List<PortalTypeVO> getPortalTypeVO();
+
+    /**
+     * 查询首页 > 项目详情页面数据
+     *
+     * @param projectId
+     * @return
+     */
+    DetailProjectVO getDetailProjectVO(Integer projectId);
 
 }

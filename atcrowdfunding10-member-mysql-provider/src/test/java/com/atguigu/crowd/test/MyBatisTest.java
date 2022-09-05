@@ -1,6 +1,7 @@
 package com.atguigu.crowd.test;
 
 import com.atguigu.crowd.entity.po.MemberPO;
+import com.atguigu.crowd.entity.vo.DetailProjectVO;
 import com.atguigu.crowd.entity.vo.PortalProjectVO;
 import com.atguigu.crowd.entity.vo.PortalTypeVO;
 import com.atguigu.crowd.mapper.MemberPOMapper;
@@ -38,6 +39,41 @@ public class MyBatisTest {
     @Autowired
     private ProjectPOMapper projectPOMapper;
 
+    /**
+     * 测试 首页 > 项目详情页面 数据
+     */
+    @Test
+    public void testSelectDetailProjectVO() {
+        DetailProjectVO detailProjectVO = projectPOMapper.selectDetailProjectVO(20);
+        logger.info(detailProjectVO.getProjectId() + "");
+        logger.info(detailProjectVO.getProjectName() + "");
+        logger.info(detailProjectVO.getProjectDesc() + "");
+        logger.info(detailProjectVO.getFollowerCount() + "");
+        logger.info(detailProjectVO.getStatus() + "");
+        logger.info(detailProjectVO.getMoney() + "");
+        logger.info(detailProjectVO.getSupportMoney() + "");
+        logger.info(detailProjectVO.getPercentage() + "");
+        logger.info(detailProjectVO.getDeployDate() + "");
+        logger.info(detailProjectVO.getLastDay() + "");
+        logger.info(detailProjectVO.getSupporterCount() + "");
+        logger.info(detailProjectVO.getHeaderPicturePath() + "");
+
+        detailProjectVO.getDetailPicturePathList().forEach(detailPicturePath -> logger.info("详情图片路径: " + detailPicturePath));
+        detailProjectVO.getDetailReturnVOList().forEach(detailReturnVO -> {
+            logger.info("" + detailReturnVO.getReturnId());
+            logger.info("" + detailReturnVO.getSupportMoney());
+            logger.info("" + detailReturnVO.getSignalPurchase());
+            logger.info("" + detailReturnVO.getPurchase());
+            logger.info("" + detailReturnVO.getSupporterCount());
+            logger.info("" + detailReturnVO.getFreight());
+            logger.info("" + detailReturnVO.getReturnDate());
+            logger.info("" + detailReturnVO.getContent());
+        });
+    }
+
+    /**
+     * 测试首页数据
+     */
     @Test
     public void testPortData() {
         List<PortalTypeVO> typeVOList = projectPOMapper.selectPortalTypeVOList();

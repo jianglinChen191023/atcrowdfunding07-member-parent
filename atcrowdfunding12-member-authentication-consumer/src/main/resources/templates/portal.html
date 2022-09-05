@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN" xmlns:th="https://www.thymeleaf.org">
+<html lang="zh-CN" xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -329,8 +330,8 @@
                                                  src="img/product-1.jpg"/>
                                             <div class="caption">
                                                 <h3 class="break">
-                                                    <!--                                                    <a th:href="@{'/portal/show/project/detail/'+${project.projectId}}"-->
-                                                    <a th:href="@{/portal/show/project/detail/{projectId}(projectId=${project.projectId})}"
+                                                    <!--                                                    <a th:href="@{${session.zuulPath}+'/portal/show/project/detail/'+${project.projectId}}"-->
+                                                    <a th:href="@{{zuulPath}/project/get/project/detail/{projectId}(projectId=${project.projectId}, zuulPath=${session.zuulPath})}"
                                                        th:text="${project.projectName}">活性富氢净水直饮机</a>
                                                 </h3>
                                                 <p>

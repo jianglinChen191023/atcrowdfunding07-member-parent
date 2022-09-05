@@ -2,6 +2,8 @@ package com.atguigu.crowd.mapper;
 
 import com.atguigu.crowd.entity.po.ProjectPO;
 import com.atguigu.crowd.entity.po.ProjectPOExample;
+import com.atguigu.crowd.entity.vo.DetailProjectVO;
+import com.atguigu.crowd.entity.vo.DetailReturnVO;
 import com.atguigu.crowd.entity.vo.PortalTypeVO;
 import org.apache.ibatis.annotations.Param;
 
@@ -58,4 +60,29 @@ public interface ProjectPOMapper {
      * @return
      */
     List<PortalTypeVO> selectPortalTypeVOList();
+
+    /**
+     * 查询首页 > 项目详情页面数据
+     *
+     * @param projectId
+     * @return
+     */
+    DetailProjectVO selectDetailProjectVO(Integer projectId);
+
+    /**
+     * 首页 > 项目详情中 > 详情图片
+     *
+     * @param projectId
+     * @return
+     */
+    List<String> selectDetailPicturePathList(Integer projectId);
+
+    /**
+     * 首页 > 项目详情中 > 回报数据
+     *
+     * @param projectId
+     * @return
+     */
+    List<DetailReturnVO> selectDetailReturnVOList(Integer projectId);
+
 }
