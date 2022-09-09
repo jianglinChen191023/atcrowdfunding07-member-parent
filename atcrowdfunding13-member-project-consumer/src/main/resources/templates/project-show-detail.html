@@ -233,7 +233,7 @@
                                         <p th:if="${return.freight == 0}">配送费用：包邮</p>
                                         <p th:if="${return.freight > 0}">配送费用：[[${return.freight}]]</p>
                                         <p>预计发放时间：项目筹款成功后的[[${return.returnDate}]]天内</p>
-                                        <a th:href="@{{zuulPath}/order/confirm/return/info/{projectId}/{returnId}(zuulPath=${session.zuulPath}, projectId=${detailProjectVO.projectId}, returnId=${return.returnId})}"
+                                        <a th:href="@{{zuulPath}/order/confirm/return/info/{returnId}(zuulPath=${session.zuulPath}, returnId=${return.returnId})}"
                                            class="btn btn-warning btn-lg">支持</a>
                                         <br>
                                         <br>

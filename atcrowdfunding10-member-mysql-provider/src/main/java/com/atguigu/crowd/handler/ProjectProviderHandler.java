@@ -1,10 +1,12 @@
 package com.atguigu.crowd.handler;
 
+import com.atguigu.crowd.constant.CrowdConstant;
 import com.atguigu.crowd.entity.vo.DetailProjectVO;
 import com.atguigu.crowd.entity.vo.PortalTypeVO;
 import com.atguigu.crowd.entity.vo.ProjectVO;
 import com.atguigu.crowd.service.api.ProjectService;
 import com.atguigu.crowd.util.ResultEntity;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,6 +29,7 @@ public class ProjectProviderHandler {
      * @param memberId  会员 id
      * @return
      */
+    @HystrixCommand(fallbackMethod = "saveProjectVORemoteBackup")
     @RequestMapping("/save/project/vo/remote")
     public ResultEntity<String> saveProjectVORemote(@RequestBody ProjectVO projectVO, @RequestParam("memberId") Integer memberId) {
         try {
@@ -38,6 +41,11 @@ public class ProjectProviderHandler {
         }
     }
 
+    public ResultEntity<String> saveProjectVORemoteBackup(@RequestBody ProjectVO projectVO, @RequestParam("memberId") Integer memberId) {
+        return ResultEntity.failed(CrowdConstant.MESSAGE_HYSTRIX_BACKUP);
+    }
+
+    @HystrixCommand(fallbackMethod = "getPortalTypeProjectDataRemoteBackup")
     @RequestMapping("/get/portal/type/project/data/remote")
     public ResultEntity<List<PortalTypeVO>> getPortalTypeProjectDataRemote() {
 
@@ -50,6 +58,11 @@ public class ProjectProviderHandler {
 
     }
 
+    public ResultEntity<List<PortalTypeVO>> getPortalTypeProjectDataRemoteBackup() {
+        return ResultEntity.failed(CrowdConstant.MESSAGE_HYSTRIX_BACKUP);
+    }
+
+    @HystrixCommand(fallbackMethod = "getDetailProjectVORemoteBackup")
     @RequestMapping("/get/project/detail/remote/{projectId}")
     ResultEntity<DetailProjectVO> getDetailProjectVORemote(@PathVariable("projectId") Integer projectId) {
 
@@ -61,6 +74,10 @@ public class ProjectProviderHandler {
             return ResultEntity.failed(e.getMessage());
         }
 
+    }
+
+    ResultEntity<DetailProjectVO> getDetailProjectVORemoteBackup(@PathVariable("projectId") Integer projectId) {
+        return ResultEntity.failed(CrowdConstant.MESSAGE_HYSTRIX_BACKUP);
     }
 
 }

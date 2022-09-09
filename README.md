@@ -296,8 +296,58 @@
         - [7.3 修改配置文件](#73-修改配置文件)
         - [7.4 启动 `Tomcat`](#74-启动-tomcat)
         - [7.5 测试](#75-测试)
-    
-    
+
+- [二十三 前台-订单](#二十三-前台-订单)
+    - [1. 搭建 `order` 开发环境](#1-搭建-order-开发环境)
+        - [1.1 追加代码 `pom.xml`](#11-追加代码-pomxml)
+        - [1.2 新建 `application.yml` 配置文件](#12-新建-applicationyml-配置文件)
+        - [1.3 新建 `CrowdMainClass` 主启动类](#13-新建-crowdmainclass-主启动类)
+    - [2. 配置 `zuul`](#2-配置-zuul)
+        - [2.1 追加路由规则 `application.yml`](#21-追加路由规则-applicationyml)
+    - [3. 建模](#3-建模)
+        - [3.1 结构](#31-结构)
+        - [3.2 物理建模](#32-物理建模)
+            - [3.2.1 订单表](#321-订单表)
+            - [3.2.2 收货地址表](#322-收货地址表)
+            - [3.2.3 项目信息表](#323-项目信息表)
+    - [4. 生成实体类, 逆向工程【reverse】工程](#4-生成实体类-逆向工程reverse工程)
+        - [4.1 追加配置](#41-追加配置)
+        - [4.2 将生成的文件移动到对应的位置](#42-将生成的文件移动到对应的位置)
+    - [5. 目标1: 确认回报内容](#5-目标1-确认回报内容)
+        - [5.1 思路](#51-思路)
+        - [5.2 操作起点](#52-操作起点)
+        - [5.3 新建 `OrderProjectVO`](#53-新建-orderprojectvo)
+        - [5.4 新建 `OderHandler`](#54-新建-oderhandler)
+        - [5.5 追加接口 【`api` 工程】](#55-追加接口-api-工程)
+        - [5.6 完成接口【`mysql` 工程】](#56-完成接口mysql-工程)
+        - [5.7 页面显示](#57-页面显示)
+            - [5.7.1 新建 `confirm_return.html`](#571-新建-confirm_returnhtml)
+    - [6. 目标2: 确认订单](#6-目标2-确认订单)
+        - [6.1 思路](#61-思路)
+        - [6.2 新建 `AddressVO`【`entity` 工程】](#62-新建-addressvoentity-工程)
+        - [6.3 追加代码, Session 域合并回报数量【`order` 工程】](#63-追加代码-session-域合并回报数量order-工程)
+        - [6.4 新建 confirm_order.html](#64-新建-confirm_orderhtml)
+        - [6.5 追加代码: 获取用户的收货地址【`api` 工程】](#65-追加代码-获取用户的收货地址api-工程)
+        - [6.6 追加代码【`mysql` 工程】](#66-追加代码mysql-工程)
+        - [6.7 新增收货地址](#67-新增收货地址)
+            - [6.7.1 思路](#671-思路)
+            - [6.7.2 发起请求](#672-发起请求)
+            - [6.7.3 `OrderHandler` 远程调用接口](#673-orderhandler-远程调用接口)
+            - [6.7.4 `OrderProviderHandler`: 保存收货地址【`mysql` 工程】](#674-orderproviderhandler-保存收货地址mysql-工程)
+            - [6.7.5 启用服务熔断机制【`mysql` 工程】](#675-启用服务熔断机制mysql-工程)
+            - [6.7.6 启用服务降级机制](#676-启用服务降级机制)
+    - [7. `Hystrix` 扩展](#7-hystrix-扩展)
+        - [7.1 服务熔断机制](#71-服务熔断机制)
+            - [7.1.1 `MemberProviderHandler` 的](#711-memberproviderhandler-的)
+            - [7.1.2 `OrderProviderHandler`的](#712-orderproviderhandler的)
+            - [7.1.3 `ProjectProviderHandler` 的](#713-projectproviderhandler-的)
+            - [7.1.4 `redis` 工程整合 `Hystrix`](#714-redis-工程整合-hystrix)
+        - [7.2 服务降级机制](#72-服务降级机制)
+            - [7.2.1 新建 `RedisFallBackFactory`](#721-新建-redisfallbackfactory)
+            - [7.2.2 使用 `RedisFallBackFactory`](#722-使用-redisfallbackfactory)
+
+
+
 # 十六 会员系统-搭建环境
 
 ## 1. 尚筹网会员系统总目标
@@ -14294,3 +14344,2582 @@ public class AlipayConfig {
 
 ![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662475256993-041d2b26-8f41-42e0-814f-763be06c3ea2.png)
 
+
+
+# 二十三 前台-订单
+
+```
+git checkout -b 23.0.0_order
+```
+
+![img](https://cdn.nlark.com/yuque/0/2022/jpeg/12811585/1662716619135-86e08dfc-6ffa-490a-a766-ca4864b3cfc8.jpeg)
+
+## 1. 搭建 `order` 开发环境
+
+### 1.1 追加代码 `pom.xml`
+
+```xml
+    <dependencies>
+        <dependency>
+            <groupId>com.atguigu.crowd</groupId>
+            <artifactId>atcrowdfunding17-member-api</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+        <!-- 导入配置文件处理器, 配置文件进行绑定 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!-- 对外暴露服务 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!-- 整合视图 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+        <!-- 作为客户端访问 Eureka 注册中心 -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+        <!-- SpringBoot 测试 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- 引入 SpringBoot & Redis 场景 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <!-- 引入 SpringBoot & SpringSession 场景 -->
+        <dependency>
+            <groupId>org.springframework.session</groupId>
+            <artifactId>spring-session-data-redis</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- 这个插件将 SpringBoot 应用打包成一个可执行的 jar 包 -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+```
+
+
+
+### 1.2 新建 `application.yml` 配置文件
+
+```yaml
+server:
+  port: 6000
+
+spring:
+  application:
+    name: atguigu-crowd-order
+  session:
+    store-type: redis
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:1000/eureka
+
+ribbon:
+  # 10秒 - 处理请求的超时时间，默认为5秒
+  ReadTimeout: 10000
+  # 10秒 - 连接建立的超时时长，默认5秒
+  ConnectTimeout: 10000
+```
+
+
+
+### 1.3 新建 `CrowdMainClass` 主启动类
+
+```java
+package com.atguigu.crowd;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.openfeign.EnableFeignClients;
+
+/**
+ * @author 陈江林
+ * @date 2022/9/7 17:13
+ */
+@EnableFeignClients
+@SpringBootApplication
+public class CrowdMainClass {
+
+    public static void main(String[] args) {
+        SpringApplication.run(CrowdMainClass.class, args);
+    }
+
+}
+```
+
+
+
+## 2. 配置 `zuul`
+
+### 2.1 追加路由规则 `application.yml`
+
+```yaml
+zuul:
+	routes:
+  	crowd-order:
+    	service-id: atguigu-crowd-order
+    	path: /order/**
+```
+
+
+
+## 3. 建模
+
+### 3.1 结构
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662543066363-188b6583-7953-4033-80eb-a03843aa127b.png)
+
+-  不加外键
+
+
+
+### 3.2 物理建模
+
+```plsql
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------
+-- Table structure for t_order
+-- ----------------------------
+DROP TABLE IF EXISTS `t_order`;
+CREATE TABLE `t_order` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `address_id` varchar(255) DEFAULT NULL COMMENT '收货地址表主键',
+  `order_name` varchar(255) DEFAULT NULL COMMENT '订单号',
+  `pay_order_num` varchar(255) DEFAULT NULL COMMENT '支付宝流水单号',
+  `order_amount` double(10, 5) DEFAULT NULL COMMENT '订单金额',
+  `invoice` varchar(255) DEFAULT NULL COMMENT '是否开发票 [{0: 不开发票}, {1: 开发票}]',
+  `invoice_title` varchar(255) DEFAULT NULL COMMENT '发票抬头',
+  `order_remark` varchar(255) DEFAULT NULL COMMENT '订单备注',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='订单表';
+
+-- ----------------------------
+-- Records of t_order
+-- ----------------------------
+BEGIN;
+COMMIT;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------
+-- Table structure for t_address
+-- ----------------------------
+DROP TABLE IF EXISTS `t_address`;
+CREATE TABLE `t_address` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `receive_name` varchar(255) DEFAULT NULL COMMENT '收件人',
+  `phone_num` varchar(255) DEFAULT NULL COMMENT '手机号',
+  `address` varchar(255) DEFAULT NULL COMMENT '地址',
+  `member_id` varchar(255) DEFAULT NULL COMMENT '会员表主键',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='收货地址表';
+
+-- ----------------------------
+-- Records of t_address
+-- ----------------------------
+BEGIN;
+COMMIT;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------
+-- Table structure for t_order_project
+-- ----------------------------
+DROP TABLE IF EXISTS `t_order_project`;
+CREATE TABLE `t_order_project` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `project_name` varchar(255) DEFAULT NULL COMMENT '项目名称',
+  `launch_name` varchar(255) DEFAULT NULL COMMENT '发起人',
+  `return_content` varchar(255) DEFAULT NULL COMMENT '回报内容',
+  `return_count` int(11) DEFAULT NULL COMMENT '回报数量',
+  `support_price` int(11) DEFAULT NULL COMMENT '支持单价',
+  `freight` int(11) DEFAULT NULL COMMENT '配送费用',
+  `order_id` varchar(255) DEFAULT NULL COMMENT '订单表主键',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='项目信息表';
+
+-- ----------------------------
+-- Records of t_order_project
+-- ----------------------------
+BEGIN;
+COMMIT;
+
+SET FOREIGN_KEY_CHECKS = 1;
+```
+
+
+
+#### 3.2.1 订单表
+
+```plsql
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------
+-- Table structure for t_order
+-- ----------------------------
+DROP TABLE IF EXISTS `t_order`;
+CREATE TABLE `t_order` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `address_id` varchar(255) DEFAULT NULL COMMENT '收货地址表主键',
+  `order_name` varchar(255) DEFAULT NULL COMMENT '订单号',
+  `pay_order_num` varchar(255) DEFAULT NULL COMMENT '支付宝流水单号',
+  `order_amount` double(10, 5) DEFAULT NULL COMMENT '订单金额',
+  `invoice` varchar(255) DEFAULT NULL COMMENT '是否开发票 [{0: 不开发票}, {1: 开发票}]',
+  `invoice_title` varchar(255) DEFAULT NULL COMMENT '发票抬头',
+  `order_remark` varchar(255) DEFAULT NULL COMMENT '订单备注',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='订单表';
+
+-- ----------------------------
+-- Records of t_order
+-- ----------------------------
+BEGIN;
+COMMIT;
+
+SET FOREIGN_KEY_CHECKS = 1;
+```
+
+
+
+#### 3.2.2 收货地址表
+
+```plsql
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------
+-- Table structure for t_address
+-- ----------------------------
+DROP TABLE IF EXISTS `t_address`;
+CREATE TABLE `t_address` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `receive_name` varchar(255) DEFAULT NULL COMMENT '收件人',
+  `phone_num` varchar(255) DEFAULT NULL COMMENT '手机号',
+  `address` varchar(255) DEFAULT NULL COMMENT '地址',
+  `member_id` varchar(255) DEFAULT NULL COMMENT '会员表主键',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='收货地址表';
+
+-- ----------------------------
+-- Records of t_address
+-- ----------------------------
+BEGIN;
+COMMIT;
+
+SET FOREIGN_KEY_CHECKS = 1;
+```
+
+
+
+#### 3.2.3 项目信息表
+
+```plsql
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------
+-- Table structure for t_order_project
+-- ----------------------------
+DROP TABLE IF EXISTS `t_order_project`;
+CREATE TABLE `t_order_project` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `project_name` varchar(255) DEFAULT NULL COMMENT '项目名称',
+  `launch_name` varchar(255) DEFAULT NULL COMMENT '发起人',
+  `return_content` varchar(255) DEFAULT NULL COMMENT '回报内容',
+  `return_count` int(11) DEFAULT NULL COMMENT '回报数量',
+  `support_price` int(11) DEFAULT NULL COMMENT '支持单价',
+  `freight` int(11) DEFAULT NULL COMMENT '配送费用',
+  `order_id` varchar(255) DEFAULT NULL COMMENT '订单表主键',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='项目信息表';
+
+-- ----------------------------
+-- Records of t_order_project
+-- ----------------------------
+BEGIN;
+COMMIT;
+
+SET FOREIGN_KEY_CHECKS = 1;
+```
+
+
+
+## 4. 生成实体类, 逆向工程【reverse】工程
+
+### 4.1 追加配置
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662547661391-94d7cc3f-cc5b-48d2-b2ec-b2d4f7b419f1.png)
+
+```xml
+<table tableName="t_order" domainObjectName="OrderPO"/>
+<table tableName="t_address" domainObjectName="AddressPO"/>
+<table tableName="t_order_project" domainObjectName="OrderProjectPO"/>
+```
+
+
+
+### 4.2 将生成的文件移动到对应的位置
+
+- 实体类记得加注解
+
+```java
+@NoArgsConstructor
+@AllArgsConstructor
+@Data
+```
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662547628215-176ca0cc-f3d7-4757-8c1a-2853f9a6e613.png)
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662547639422-494b0ad3-79ab-4b11-a498-15fde8a2f1da.png)
+
+
+
+## 5. 目标1: 确认回报内容
+
+### 5.1 思路
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662548296095-35379c7b-4f67-49b5-bbce-da689cc1e92a.png)
+
+
+
+### 5.2 操作起点
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662548805196-18dc8521-1d13-477c-a7c5-f8e2804135e0.png)
+
+- 关键代码
+
+```html
+<a th:href="@{{zuulPath}/order/confirm/return/info/{returnId}(zuulPath=${session.zuulPath}, returnId=${return.returnId})}"
+                                           class="btn btn-warning btn-lg">支持</a>
+```
+
+
+
+### 5.3 新建 `OrderProjectVO`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662550297381-3e7f04fd-e86c-41a3-a803-eb1676a05f70.png)
+
+```java
+package com.atguigu.crowd.entity.vo;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.io.Serializable;
+
+/**
+ * @author 陈江林
+ * @date 2022/9/7 19:09
+ */
+@NoArgsConstructor
+@AllArgsConstructor
+@Data
+public class OrderProjectVO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    private Integer id;
+
+    /**
+     * 项目名称
+     */
+    private String projectName;
+
+    /**
+     * 发起人
+     */
+    private String launchName;
+
+    /**
+     * 回报内容
+     */
+    private String returnContent;
+
+    /**
+     * 回报数量
+     */
+    private Integer returnCount;
+
+    /**
+     * 支持单价
+     */
+    private Integer supportPrice;
+
+    /**
+     * 配送费用
+     */
+    private Integer freight;
+
+    /**
+     * 订单表主键
+     */
+    private String orderId;
+
+    /**
+     * 是否设置单笔限购
+     */
+    private Integer signalPurchase;
+
+    /**
+     * 具体限购数量
+     */
+    private Integer purchase;
+
+}
+```
+
+
+
+### 5.4 新建 `OderHandler`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662550385549-c5cab60c-31bc-4b67-a64b-345335402bd5.png)
+
+```java
+package com.atguigu.crowd.handler;
+
+import com.atguigu.crowd.api.MySQLRemoteService;
+import com.atguigu.crowd.entity.vo.OrderProjectVO;
+import com.atguigu.crowd.util.ResultEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+import javax.servlet.http.HttpSession;
+
+/**
+ * @author 陈江林
+ * @date 2022/9/7 19:32
+ */
+@Controller
+public class OderHandler {
+
+    @Autowired
+    private MySQLRemoteService mySQLRemoteService;
+
+    /**
+     * 首页 -> 项目详情（点击支持） -> 显示回报确认信息
+     *
+     * @param returnId 
+     * @param session  
+     * @return {@link String}
+     */
+    @RequestMapping("/confirm/return/info/{returnId}")
+    public String showReturnConfirmInfo(@PathVariable("returnId") Integer returnId,
+                                        HttpSession session) {
+        // 查询数据
+        ResultEntity<OrderProjectVO> resultEntity = mySQLRemoteService.getOrderProjectVORemote(returnId);
+
+        // 判断查询结果
+        if (ResultEntity.SUCCESS.equals(resultEntity.getResult())) {
+            OrderProjectVO orderProjectVO = resultEntity.getData();
+
+            // 为了能够在后续操作中保存 orderProjectVO 数据, 存入 Session 域中
+            session.setAttribute("orderProjectVO", orderProjectVO);
+        }
+
+        return "confirm_return";
+    }
+
+}
+```
+
+
+
+### 5.5 追加接口 【`api` 工程】
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662551959570-982a8924-388f-40d0-9ad9-2ee5bfb5515b.png)
+
+```java
+    /**
+     * 获取订单项目
+     *
+     * @param returnId 回报id
+     * @return {@link ResultEntity}<{@link OrderProjectVO}>
+     */
+    @RequestMapping("/get/order/project/vo/remote/{returnId}")
+    ResultEntity<OrderProjectVO> getOrderProjectVORemote(@PathVariable("returnId") Integer returnId);
+```
+
+
+
+### 5.6 完成接口【`mysql` 工程】
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662553043452-43062c10-507c-467b-a42a-8b89c887e654.png)
+
+- 新建 `OrderProviderHandler`
+
+```java
+package com.atguigu.crowd.handler;
+
+import com.atguigu.crowd.entity.vo.OrderProjectVO;
+import com.atguigu.crowd.service.api.OrderService;
+import com.atguigu.crowd.util.ResultEntity;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * @author 陈江林
+ * @date 2022/9/7 20:15
+ */
+@RestController
+public class OrderProviderHandler {
+
+    @Autowired
+    private OrderService orderService;
+
+    @RequestMapping("/get/order/project/vo/remote/{returnId}")
+    ResultEntity<OrderProjectVO> getOrderProjectVORemote(@PathVariable("returnId") Integer returnId) {
+        try {
+            OrderProjectVO orderProjectVO = orderService.getOrderProjectVO(returnId);
+            return ResultEntity.successWithData(orderProjectVO);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResultEntity.failed(e.getMessage());
+        }
+    }
+
+}
+```
+
+
+
+- 新建 `OrderService`
+
+```java
+package com.atguigu.crowd.service.api;
+
+import com.atguigu.crowd.entity.vo.OrderProjectVO;
+import com.atguigu.crowd.util.ResultEntity;
+
+/**
+ * @author 陈江林
+ * @date 2022/9/7 20:16
+ */
+public interface OrderService {
+
+    /**
+     * 获取订单项目视图对象
+     *
+     * @param returnId  回报id
+     * @return {@link ResultEntity}<{@link OrderProjectVO}>
+     */
+    OrderProjectVO getOrderProjectVO(Integer returnId);
+
+}
+```
+
+
+
+- 新建 `OrderServiceImpl`
+
+```java
+package com.atguigu.crowd.service.impl;
+
+import com.atguigu.crowd.entity.vo.OrderProjectVO;
+import com.atguigu.crowd.mapper.AddressPOMapper;
+import com.atguigu.crowd.mapper.OrderPOMapper;
+import com.atguigu.crowd.mapper.OrderProjectPOMapper;
+import com.atguigu.crowd.service.api.OrderService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * @author 陈江林
+ * @date 2022/9/7 20:17
+ */
+@Service
+@Transactional(readOnly = true)
+public class OrderServiceImpl implements OrderService {
+
+    @Autowired
+    private OrderProjectPOMapper orderProjectPOMapper;
+
+    @Autowired
+    private OrderPOMapper orderPOMapper;
+
+    @Autowired
+    private AddressPOMapper addressPOMapper;
+
+    @Override
+    public OrderProjectVO getOrderProjectVO(Integer returnId) {
+        return orderProjectPOMapper.selectOrderProjectVO(returnId);
+    }
+
+}
+```
+
+
+
+- 追加
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662555210086-192721d6-1c1d-44d1-9428-3820736cd5d6.png)
+
+```java
+    /**
+     * 查询订单项目视图对象
+     *
+     * @param returnId 回报id
+     * @return {@link OrderProjectVO}
+     */
+    OrderProjectVO selectOrderProjectVO(Integer returnId);
+```
+
+- 追加
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662555252602-de1f0e6a-646b-4cd5-800e-6c5cbefe1d26.png)
+
+```xml
+  <select id="selectOrderProjectVO" resultType="com.atguigu.crowd.entity.vo.OrderProjectVO">
+    select distinct project_name          projectName,
+                    content               returnContent,
+                    description_simple    launchName,
+                    t_return.supportmoney supportPrice,
+                    freight,
+                    count                 returnCount,
+                    signalpurchase        signalPurchase,
+                    purchase
+    from t_return
+           left join t_project on t_return.projectid = t_project.id
+           left join t_member_launch_info on t_project.memberid = t_member_launch_info.memberid
+    where t_return.id = #{returnId}
+  </select>
+```
+
+
+
+### 5.7 页面显示
+
+#### 5.7.1 新建 `confirm_return.html`
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <base th:href="@{/}"/>
+    <link rel="stylesheet" href="bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/font-awesome.min.css">
+    <link rel="stylesheet" href="css/theme.css">
+    <script src="jquery/jquery-2.1.1.min.js"></script>
+    <script src="bootstrap/js/bootstrap.min.js"></script>
+    <script src="script/docs.min.js"></script>
+    <script src="script/back-to-top.js"></script>
+    <script type="text/javascript">
+        var signalPurchase = [[${session.orderProjectVO.signalPurchase}]];
+        var purchase = [[${session.orderProjectVO.purchase}]];
+
+        $(function () {
+            $('#myTab a').click(function (e) {
+                e.preventDefault()
+                $(this).tab('show')
+            });
+
+            $("#returnCountInput").change(function () {
+                var returnCount = $.trim($(this).val());
+
+                if (returnCount == null || returnCount == "") {
+                    alert("请输入有效数据！");
+
+                    $(this).val(this.defaultValue);
+
+                    return;
+                }
+
+                if (signalPurchase == 1 && returnCount > purchase) {
+                    alert("不能超过限购数量！");
+                    return;
+                }
+
+                var supportPrice = [[${session.orderProjectVO.supportPrice}]];
+
+                $("#totalAmount").text("￥" + (supportPrice * returnCount));
+            });
+
+            $("#submitBtn").click(function () {
+                var returnCount = $("#returnCountInput").val();
+                window.location.href = "order/confirm/order/" + returnCount;
+            });
+        })
+    </script>
+    <style>
+        #footer {
+            padding: 15px 0;
+            background: #fff;
+            border-top: 1px solid #ddd;
+            text-align: center;
+        }
+
+        #topcontrol {
+            color: #fff;
+            z-index: 99;
+            width: 30px;
+            height: 30px;
+            font-size: 20px;
+            background: #222;
+            position: relative;
+            right: 14px !important;
+            bottom: 11px !important;
+            border-radius: 3px !important;
+        }
+
+        #topcontrol:after {
+            /*top: -2px;*/
+            left: 8.5px;
+            content: "\f106";
+            position: absolute;
+            text-align: center;
+            font-family: FontAwesome;
+        }
+
+        #topcontrol:hover {
+            color: #fff;
+            background: #18ba9b;
+            -webkit-transition: all 0.3s ease-in-out;
+            -moz-transition: all 0.3s ease-in-out;
+            -o-transition: all 0.3s ease-in-out;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .label-type, .label-status, .label-order {
+            background-color: #fff;
+            color: #f60;
+            padding: 5px;
+            border: 1px #f60 solid;
+        }
+
+        #typeList :not (:first-child ) {
+            margin-top: 20px;
+        }
+
+        .label-txt {
+            margin: 10px 10px;
+            border: 1px solid #ddd;
+            padding: 4px;
+            font-size: 14px;
+        }
+
+        .panel {
+            border-radius: 0;
+        }
+
+        .progress-bar-default {
+            background-color: #ddd;
+        }
+    </style>
+</head>
+<body>
+<div class="navbar-wrapper">
+    <div class="container">
+        <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+            <div class="container">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="index.html" style="font-size: 32px;">尚筹网-创意产品众筹平台</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse"
+                     style="float: right;">
+                    <ul class="nav navbar-nav">
+                        <li class="dropdown"><a href="#" class="dropdown-toggle"
+                                                data-toggle="dropdown"><i class="glyphicon glyphicon-user"></i>
+                            [[${session.loginMember.username}]]<span class="caret"></span></a>
+                            <ul class="dropdown-menu" role="menu">
+                                <li><a href="member.html"><i
+                                        class="glyphicon glyphicon-scale"></i> 会员中心</a></li>
+                                <li><a href="#"><i class="glyphicon glyphicon-comment"></i>
+                                    消息</a></li>
+                                <li class="divider"></li>
+                                <li><a th:href="@{/auth/member/logout}"><i
+                                        class="glyphicon glyphicon-off"></i> 退出系统</a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </div>
+</div>
+
+<div class="container theme-showcase" role="main">
+
+    <div class="container">
+        <div class="row clearfix">
+            <div class="col-md-12 column">
+                <div class="panel panel-default">
+                    <div class="panel-heading" style="text-align: center;">
+                        <div class="container-fluid">
+                            <div class="row clearfix">
+                                <div class="col-md-3 column">
+                                    <div class="progress"
+                                         style="height: 50px; border-radius: 0; position: absolute; width: 75%; right: 49px;">
+                                        <div class="progress-bar progress-bar-success"
+                                             role="progressbar" aria-valuenow="60" aria-valuemin="0"
+                                             aria-valuemax="100" style="width: 100%; height: 50px;">
+                                            <div style="font-size: 16px; margin-top: 15px;">1.
+                                                确认回报内容
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div
+                                            style="right: 0; border: 10px solid #ddd; border-left-color: #88b7d5; border-width: 25px; position: absolute; border-left-color: rgba(92, 184, 92, 1); border-top-color: rgba(92, 184, 92, 0); border-bottom-color: rgba(92, 184, 92, 0); border-right-color: rgba(92, 184, 92, 0);">
+                                    </div>
+                                </div>
+                                <div class="col-md-3 column">
+                                    <div class="progress"
+                                         style="height: 50px; border-radius: 0; position: absolute; width: 75%; right: 49px;">
+                                        <div class="progress-bar progress-bar-default"
+                                             role="progressbar" aria-valuenow="60" aria-valuemin="0"
+                                             aria-valuemax="100" style="width: 100%; height: 50px;">
+                                            <div style="font-size: 16px; margin-top: 15px;">2.
+                                                确认订单
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div
+                                            style="right: 0; border: 10px solid #ddd; border-left-color: #88b7d5; border-width: 25px; position: absolute; border-left-color: rgba(221, 221, 221, 1); border-top-color: rgba(221, 221, 221, 0); border-bottom-color: rgba(221, 221, 221, 0); border-right-color: rgba(221, 221, 221, 0);">
+                                    </div>
+                                </div>
+                                <div class="col-md-3 column">
+                                    <div class="progress"
+                                         style="height: 50px; border-radius: 0; position: absolute; width: 75%; right: 49px;">
+                                        <div class="progress-bar progress-bar-default"
+                                             role="progressbar" aria-valuenow="60" aria-valuemin="0"
+                                             aria-valuemax="100" style="width: 100%; height: 50px;">
+                                            <div style="font-size: 16px; margin-top: 15px;">3. 付款</div>
+                                        </div>
+                                    </div>
+                                    <div
+                                            style="right: 0; border: 10px solid #ddd; border-left-color: #88b7d5; border-width: 25px; position: absolute; border-left-color: rgba(221, 221, 221, 1); border-top-color: rgba(221, 221, 221, 0); border-bottom-color: rgba(221, 221, 221, 0); border-right-color: rgba(221, 221, 221, 0);">
+                                    </div>
+                                </div>
+                                <div class="col-md-3 column">
+                                    <div class="progress" style="height: 50px; border-radius: 0;">
+                                        <div class="progress-bar progress-bar-default"
+                                             role="progressbar" aria-valuenow="60" aria-valuemin="0"
+                                             aria-valuemax="100" style="width: 100%; height: 50px;">
+                                            <div style="font-size: 16px; margin-top: 15px;">4. 完成</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="container-fluid">
+                            <div class="row clearfix">
+                                <div class="col-md-12 column">
+                                    <blockquote
+                                            style="border-left: 5px solid #f60; color: #f60; padding: 0 0 0 20px;">
+                                        <b> 请确认您所选择的回报项信息和购买数量 </b>
+                                    </blockquote>
+                                </div>
+                                <div class="col-md-12 column">
+                                    <table class="table table-bordered"
+                                           style="text-align: center;">
+                                        <thead>
+                                        <tr style="background-color: #ddd;">
+                                            <td>项目名称</td>
+                                            <td>发起人</td>
+                                            <td width="300">回报内容</td>
+                                            <td width="80">回报数量</td>
+                                            <td>支持单价</td>
+                                            <td>配送费用</td>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr>
+                                            <td th:text="${session.orderProjectVO.projectName}">活性富氢净水直饮机</td>
+                                            <td th:text="${session.orderProjectVO.launchName}">深圳市博实永道电子商务有限公司</td>
+                                            <td th:text="${session.orderProjectVO.returnContent}">
+                                                每满1750人抽取一台活性富氢净水直饮机，至少抽取一台。抽取名额（小数点后一位四舍五入）=参与人数÷1750人，由苏宁官方抽取。
+                                            </td>
+                                            <td><input id="returnCountInput" type="text" class="form-control"
+                                                       style="width: 60px;"
+                                                       th:value="${session.orderProjectVO.returnCount}"></td>
+                                            <td style="color: #F60" th:text="${session.orderProjectVO.supportPrice}">￥
+                                                1.00
+                                            </td>
+                                            <td th:if="${session.orderProjectVO.freight == 0}">免运费</td>
+                                            <td th:if="${session.orderProjectVO.freight != 0}"
+                                                th:text="${session.orderProjectVO.freight}">免运费
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                    <div style="float: right;">
+                                        <p>
+                                            总价(含运费)：<span id="totalAmount" style="font-size: 16px; color: #F60;">￥[[${session.orderProjectVO.returnCount * session.orderProjectVO.supportPrice}]]</span>
+                                        </p>
+                                        <button id="submitBtn" type="button" class="btn btn-warning btn-lg"
+                                                style="float: right;">
+                                            <i class="glyphicon glyphicon-credit-card"></i> 去结算
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="container">
+                                    <div class="row clearfix">
+                                        <div class="col-md-12 column">
+                                            <blockquote>
+                                                <p>
+                                                    <i class="glyphicon glyphicon-info-sign"
+                                                       style="color: #2a6496;"></i> 提示
+                                                </p>
+                                                <br> <span style="font-size: 12px;">1.众筹并非商品交易，存在一定风险。支持者根据自己的判断选择、支持众筹项目，与发起人共同实现梦想并获得发起人承诺的回报。<br>
+														2.众筹平台仅提供平台网络空间及技术支持等中介服务，众筹仅存在于发起人和支持者之间，使用众筹平台产生的法律后果由发起人与支持者自行承担。<br>
+														3.本项目必须在2017-06-04之前达到 ￥1000000.00
+														的目标才算成功，否则已经支持的订单将取消。订单取消或募集失败的，您支持的金额将原支付路径退回。<br>
+														4.请在支持项目后15分钟内付款，否则您的支持请求会被自动关闭。<br>
+														5.众筹成功后由发起人统一进行发货，售后服务由发起人统一提供；如果发生发起人无法发放回报、延迟发放回报、不提供回报后续服务等情况，您需要直接和发起人协商解决。<br>
+														6.如您不同意上述风险提示内容，您有权选择不支持；一旦选择支持，视为您已确认并同意以上提示内容。
+													</span>
+                                            </blockquote>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container" style="margin-top: 20px;">
+        <div class="row clearfix">
+            <div class="col-md-12 column">
+                <div id="footer">
+                    <div class="footerNav">
+                        <a rel="nofollow" href="http://www.atguigu.com">关于我们</a> | <a
+                            rel="nofollow" href="http://www.atguigu.com">服务条款</a> | <a
+                            rel="nofollow" href="http://www.atguigu.com">免责声明</a> | <a
+                            rel="nofollow" href="http://www.atguigu.com">网站地图</a> | <a
+                            rel="nofollow" href="http://www.atguigu.com">联系我们</a>
+                    </div>
+                    <div class="copyRight">Copyright ?2010-2014atguigu.com 版权所有
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /container -->
+
+</body>
+</html>
+```
+
+
+
+## 6. 目标2: 确认订单
+
+### 6.1 思路
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662561009155-9bd03ed2-f0ea-455d-a066-8513ae91741c.png)
+
+
+
+### 6.2 新建 `AddressVO`【`entity` 工程】
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662561152423-6cf43cbc-cf4d-40b3-8dc3-a6b9698506f1.png)
+
+```java
+package com.atguigu.crowd.entity.vo;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.io.Serializable;
+
+/**
+ * @author 陈江林
+ * @date 2022/9/7 22:30
+ */
+@NoArgsConstructor
+@AllArgsConstructor
+@Data
+public class AddressVO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    private Integer id;
+
+    /**
+     * 收件人
+     */
+    private String receiveName;
+
+    /**
+     * 手机号
+     */
+    private String phoneNum;
+
+    /**
+     * 地址
+     */
+    private String address;
+
+    /**
+     * 会员表主键
+     */
+    private String memberId;
+
+}
+```
+
+
+
+### 6.3 追加代码, Session 域合并回报数量【`order` 工程】
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662561216453-e3af2e6d-4d60-4a1b-9166-d46084db65f5.png)
+
+```java
+    /**
+     * 首页 -> 项目详情（点击支持） -> 显示回报确认信息 -> 显示返回确认信息
+     *
+     * @param returnCount 回报数量
+     * @param session
+     * @return {@link String}
+     */
+    @RequestMapping("/confirm/order/{returnCount}")
+    public String showReturnOrderInfo(@PathVariable("returnCount") Integer returnCount,
+                                      HttpSession session) {
+        // 1. 把接收到的回报数量合并到 Session 域
+        OrderProjectVO orderProjectVO = (OrderProjectVO) session.getAttribute("orderProjectVO");
+        orderProjectVO.setReturnCount(returnCount);
+        session.setAttribute("orderProjectVO", orderProjectVO);
+
+        // 2. 获取当前已登录用户的 id
+        MemberLoginVO memberLoginVO = (MemberLoginVO) session.getAttribute(CrowdConstant.ATTR_NAME_LOGIN_MEMBER);
+        Integer memberId = memberLoginVO.getId();
+
+        // /3.查询目前的收货地址数据
+        ResultEntity<List<AddressVO>> resultEntity = mySQLRemoteService.getAddressVOListRemote(memberId);
+        if (ResultEntity.SUCCESS.equals(resultEntity.getResult())) {
+            List<AddressVO> addressVOList = resultEntity.getData();
+            session.setAttribute("addressVOList", addressVOList);
+        }
+
+        return "confirm_order";
+    }
+```
+
+
+
+### 6.4 新建 confirm_order.html
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <base th:href="@{/}"/>
+    <link rel="stylesheet" href="bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/font-awesome.min.css">
+    <link rel="stylesheet" href="css/theme.css">
+    <script src="jquery/jquery-2.1.1.min.js"></script>
+    <script src="bootstrap/js/bootstrap.min.js"></script>
+    <script src="script/docs.min.js"></script>
+    <script src="script/back-to-top.js"></script>
+    <script type="text/javascript" src="layer/layer.js"></script>
+    <script type="text/javascript">
+        $(function () {
+            $("#payButton").click(function () {
+                // 1.收集所有要提交的表单项的数据
+                var addressId = $("[name=addressId]:checked").val();
+                var invoice = $("[name=invoiceRadio]:checked").val();
+                var invoiceTitle = $.trim($("[name=invoiceTitle]").val());
+                var remark = $.trim($("[name=remark]").val());
+
+                // 2.将上面收集到的表单数据填充到空表单中并提交
+                $("#summaryForm")
+                    .append("<input type='hidden' name='addressId' value='" + addressId + "'/>")
+                    .append("<input type='hidden' name='invoice' value='" + invoice + "'/>")
+                    .append("<input type='hidden' name='invoiceTitle' value='" + invoiceTitle + "'/>")
+                    .append("<input type='hidden' name='orderRemark' value='" + remark + "'/>")
+                    .submit();
+            });
+
+            $("#knowRoleCheckBox").click(function () {
+                var currentStatus = this.checked;
+                if (currentStatus) {
+                    $("#payButton").prop("disabled", "");
+                } else {
+                    $("#payButton").prop("disabled", "disabled");
+                }
+            });
+
+            $('#myTab a').click(function (e) {
+                e.preventDefault()
+                $(this).tab('show')
+            })
+        })
+    </script>
+    <style>
+        #footer {
+            padding: 15px 0;
+            background: #fff;
+            border-top: 1px solid #ddd;
+            text-align: center;
+        }
+
+        #topcontrol {
+            color: #fff;
+            z-index: 99;
+            width: 30px;
+            height: 30px;
+            font-size: 20px;
+            background: #222;
+            position: relative;
+            right: 14px !important;
+            bottom: 11px !important;
+            border-radius: 3px !important;
+        }
+
+        #topcontrol:after {
+            /*top: -2px;*/
+            left: 8.5px;
+            content: "\f106";
+            position: absolute;
+            text-align: center;
+            font-family: FontAwesome;
+        }
+
+        #topcontrol:hover {
+            color: #fff;
+            background: #18ba9b;
+            -webkit-transition: all 0.3s ease-in-out;
+            -moz-transition: all 0.3s ease-in-out;
+            -o-transition: all 0.3s ease-in-out;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .label-type, .label-status, .label-order {
+            background-color: #fff;
+            color: #f60;
+            padding: 5px;
+            border: 1px #f60 solid;
+        }
+
+        #typeList :not (:first-child ) {
+            margin-top: 20px;
+        }
+
+        .label-txt {
+            margin: 10px 10px;
+            border: 1px solid #ddd;
+            padding: 4px;
+            font-size: 14px;
+        }
+
+        .panel {
+            border-radius: 0;
+        }
+
+        .progress-bar-default {
+            background-color: #ddd;
+        }
+    </style>
+</head>
+<body>
+<div class="navbar-wrapper">
+    <div class="container">
+        <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+            <div class="container">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="index.html" style="font-size: 32px;">尚筹网-创意产品众筹平台</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse"
+                     style="float: right;">
+                    <ul class="nav navbar-nav">
+                        <li class="dropdown"><a href="#" class="dropdown-toggle"
+                                                data-toggle="dropdown"><i class="glyphicon glyphicon-user"></i>
+                            [[${session.loginMember.username}]]<span class="caret"></span></a>
+                            <ul class="dropdown-menu" role="menu">
+                                <li><a href="member.html"><i
+                                        class="glyphicon glyphicon-scale"></i> 会员中心</a></li>
+                                <li><a href="#"><i class="glyphicon glyphicon-comment"></i>
+                                    消息</a></li>
+                                <li class="divider"></li>
+                                <li><a th:href="@{/auth/member/logout}"><i
+                                        class="glyphicon glyphicon-off"></i> 退出系统</a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </div>
+</div>
+
+<div class="container theme-showcase" role="main">
+
+    <div class="container">
+        <div class="row clearfix">
+            <div class="col-md-12 column">
+                <div class="panel panel-default">
+                    <div class="panel-heading" style="text-align: center;">
+                        <div class="container-fluid">
+                            <div class="row clearfix">
+                                <div class="col-md-3 column">
+                                    <div class="progress"
+                                         style="height: 50px; border-radius: 0; position: absolute; width: 75%; right: 49px;">
+                                        <div class="progress-bar progress-bar-default"
+                                             role="progressbar" aria-valuenow="60" aria-valuemin="0"
+                                             aria-valuemax="100" style="width: 100%; height: 50px;">
+                                            <div style="font-size: 16px; margin-top: 15px;">1.
+                                                确认回报内容
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div
+                                            style="right: 0; border: 10px solid #ddd; border-left-color: #88b7d5; border-width: 25px; position: absolute; border-left-color: rgba(221, 221, 221, 1); border-top-color: rgba(221, 221, 221, 0); border-bottom-color: rgba(221, 221, 221, 0); border-right-color: rgba(221, 221, 221, 0);">
+                                    </div>
+                                </div>
+                                <div class="col-md-3 column">
+                                    <div class="progress"
+                                         style="height: 50px; border-radius: 0; position: absolute; width: 75%; right: 49px;">
+                                        <div class="progress-bar progress-bar-success"
+                                             role="progressbar" aria-valuenow="60" aria-valuemin="0"
+                                             aria-valuemax="100" style="width: 100%; height: 50px;">
+                                            <div style="font-size: 16px; margin-top: 15px;">2.
+                                                确认订单
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div
+                                            style="right: 0; border: 10px solid #ddd; border-left-color: #88b7d5; border-width: 25px; position: absolute; border-left-color: rgba(92, 184, 92, 1); border-top-color: rgba(92, 184, 92, 0); border-bottom-color: rgba(92, 184, 92, 0); border-right-color: rgba(92, 184, 92, 0);">
+                                    </div>
+                                </div>
+                                <div class="col-md-3 column">
+                                    <div class="progress"
+                                         style="height: 50px; border-radius: 0; position: absolute; width: 75%; right: 49px;">
+                                        <div class="progress-bar progress-bar-default"
+                                             role="progressbar" aria-valuenow="60" aria-valuemin="0"
+                                             aria-valuemax="100" style="width: 100%; height: 50px;">
+                                            <div style="font-size: 16px; margin-top: 15px;">3. 付款</div>
+                                        </div>
+                                    </div>
+                                    <div
+                                            style="right: 0; border: 10px solid #ddd; border-left-color: #88b7d5; border-width: 25px; position: absolute; border-left-color: rgba(221, 221, 221, 1); border-top-color: rgba(221, 221, 221, 0); border-bottom-color: rgba(221, 221, 221, 0); border-right-color: rgba(221, 221, 221, 0);">
+                                    </div>
+                                </div>
+                                <div class="col-md-3 column">
+                                    <div class="progress" style="height: 50px; border-radius: 0;">
+                                        <div class="progress-bar progress-bar-default"
+                                             role="progressbar" aria-valuenow="60" aria-valuemin="0"
+                                             aria-valuemax="100" style="width: 100%; height: 50px;">
+                                            <div style="font-size: 16px; margin-top: 15px;">4. 完成</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="container-fluid">
+                            <div class="row clearfix">
+                                <div class="col-md-12 column">
+                                    <div class="alert alert-warning alert-dismissable"
+                                         style="color: red;">
+                                        <button type="button" class="close" data-dismiss="alert"
+                                                aria-hidden="true">×
+                                        </button>
+                                        <i class="glyphicon glyphicon-info-sign"></i>
+                                        <strong>请在下单后15分钟内付款，否则您的订单会被自动关闭。</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="address" class="container-fluid">
+                            <div class="row clearfix">
+                                <div class="col-md-12 column">
+                                    <blockquote
+                                            style="border-left: 5px solid #f60; color: #f60; padding: 0 0 0 20px;">
+                                        <b> 收货地址 </b>
+                                    </blockquote>
+                                </div>
+                                <div class="col-md-12 column" style="padding: 0 120px;">
+                                    <div th:if="${#lists.isEmpty(session.addressVOList)}">尚未创建收货地址</div>
+                                    <div th:unless="${#lists.isEmpty(session.addressVOList)}" id="showAddress">
+                                        <div th:each="address : ${session.addressVOList}" class="radio">
+                                            <label> <input type="radio" name="addressId" th:value="${address.id}"
+                                                           id="optionsRadios1"/> [[${address.receiveName}]]
+                                                [[${address.phoneNum}]] [[${address.address}]]
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="radio">
+                                        <label> <input type="radio" name="optionsRadios"
+                                                       id="optionsRadios2" value="option2"> 新地址
+                                        </label>
+                                    </div>
+                                    <div
+                                            style="border: 10px solid #f60; border-bottom-color: #eceeef; border-width: 10px; width: 20px; margin-left: 20px; margin-top: -20px; border-left-color: rgba(221, 221, 221, 0); border-top-color: rgba(221, 221, 221, 0); border-right-color: rgba(221, 221, 221, 0);"></div>
+                                    <div class="panel panel-default"
+                                         style="border-style: dashed; background-color: #eceeef">
+                                        <div class="panel-body">
+                                            <div class="col-md-12 column">
+                                                <form action="order/save/address" method="post" class="form-horizontal">
+                                                    <input type="hidden" name="memberId"
+                                                           th:value="${session.loginMember.id}"/>
+                                                    <div class="form-group">
+                                                        <label class="col-sm-2 control-label">收货人（*）</label>
+                                                        <div class="col-sm-10">
+                                                            <input type="text" name="receiveName" class="form-control"
+                                                                 value="收货人" style="width: 200px;" placeholder="姓名：xxxx">
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label class="col-sm-2 control-label">手机（*）</label>
+                                                        <div class="col-sm-10">
+                                                            <input class="form-control" name="phoneNum" type="text"
+                                                                   style="width: 200px;"
+                                                                  value="18512341234" placeholder="请填写11位手机号码"/>
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label class="col-sm-2 control-label">地址（*）</label>
+                                                        <div class="col-sm-10">
+                                                            <input class="form-control" name="address" type="text"
+                                                                   style="width: 400px;"
+                                                                  value="收货地址" placeholder="请填写收货地址"/>
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label class="col-sm-2 control-label"></label>
+                                                        <div class="col-sm-10">
+                                                            <button id="saveAddress" type="button"
+                                                                    class="btn btn-primary">确认配送信息
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="container-fluid">
+                            <div class="row clearfix">
+                                <div class="col-md-12 column">
+                                    <blockquote
+                                            style="border-left: 5px solid #f60; color: #f60; padding: 0 0 0 20px;">
+                                        <b> 发票信息 </b>
+                                    </blockquote>
+                                </div>
+                                <div class="col-md-12 column" style="padding: 0 120px;">
+                                    <div class="radio">
+                                        <label> <input type="radio" name="invoiceRadio"
+                                                       id="optionsRadios3" value="0" checked> 无需发票
+                                        </label>
+                                    </div>
+                                    <div class="radio">
+                                        <label> <input type="radio" name="invoiceRadio"
+                                                       id="optionsRadios4" value="1"> 需要发票
+                                        </label>
+                                    </div>
+                                    <div
+                                            style="border: 10px solid #f60; border-bottom-color: #eceeef; border-width: 10px; width: 20px; margin-left: 20px; margin-top: -20px; border-left-color: rgba(221, 221, 221, 0); border-top-color: rgba(221, 221, 221, 0); border-right-color: rgba(221, 221, 221, 0);"></div>
+                                    <div class="panel panel-default"
+                                         style="border-style: dashed; background-color: #eceeef">
+                                        <div class="panel-body">
+                                            <div class="col-md-12 column">
+                                                <form class="form-horizontal">
+                                                    <div class="form-group">
+                                                        <label class="col-sm-2 control-label">发票抬头（*）</label>
+                                                        <div class="col-sm-10">
+                                                            <input type="text" name="invoiceTitle" class="form-control"
+                                                                   style="width: 200px;" placeholder="个人">
+                                                        </div>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="container-fluid">
+                            <div class="row clearfix">
+                                <div class="col-md-12 column">
+                                    <blockquote
+                                            style="border-left: 5px solid #f60; color: #f60; padding: 0 0 0 20px;">
+                                        <b> 项目信息 <a style="font-size: 12px;"
+                                                    href="pay-step-1.html">修改数量</a>
+                                        </b>
+                                    </blockquote>
+                                </div>
+                                <div class="col-md-12 column">
+                                    <table class="table table-bordered"
+                                           style="text-align: center;">
+                                        <thead>
+                                        <tr style="background-color: #ddd;">
+                                            <td>项目名称</td>
+                                            <td>发起人</td>
+                                            <td width="300">回报内容</td>
+                                            <td width="80">回报数量</td>
+                                            <td>支持单价</td>
+                                            <td>配送费用</td>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr>
+                                            <td th:text="${session.orderProjectVO.projectName}">活性富氢净水直饮机</td>
+                                            <td th:text="${session.orderProjectVO.launchName}">深圳市博实永道电子商务有限公司</td>
+                                            <td th:text="${session.orderProjectVO.returnContent}">
+                                                每满1750人抽取一台活性富氢净水直饮机，至少抽取一台。抽取名额（小数点后一位四舍五入）=参与人数÷1750人，由苏宁官方抽取。
+                                            </td>
+                                            <td th:text="${session.orderProjectVO.returnCount}">55</td>
+                                            <td style="color: #F60" th:text="${session.orderProjectVO.supportPrice}">￥
+                                                1.00
+                                            </td>
+                                            <td th:if="${session.orderProjectVO.freight == 0}">免运费</td>
+                                            <td th:if="${session.orderProjectVO.freight != 0}"
+                                                th:text="${session.orderProjectVO.freight}">免运费
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="col-md-12 column">
+                                    <div class="form-group">
+                                        <label class="col-sm-2 control-label">备注</label>
+                                        <div class="col-sm-10">
+												<textarea class="form-control" name="remark" rows="1"
+                                                          placeholder="填写关于回报或发起人希望您备注的信息"></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-12 column">
+                                    <blockquote
+                                            style="border-left: 5px solid #f60; color: #f60; padding: 0 0 0 20px;">
+                                        <b> 账单 </b>
+                                    </blockquote>
+                                </div>
+
+                                <div class="col-md-12 column">
+                                    <div class="alert alert-warning alert-dismissable"
+                                         style="text-align: right; border: 2px solid #ffc287;">
+                                        <ul style="list-style: none;">
+                                            <li style="margin-top: 10px;">支持金额：<span
+                                                    style="color: red;">￥[[${session.orderProjectVO.returnCount * session.orderProjectVO.supportPrice}]]</span>
+                                            </li>
+                                            <li style="margin-top: 10px;">配送费用：<span
+                                                    style="color: red;">￥[[${session.orderProjectVO.freight}]]</span>
+                                            </li>
+                                            <li style="margin-top: 10px; margin-bottom: 10px;"><h2>
+                                                支付总金额：<span style="color: red;">￥[[${session.orderProjectVO.returnCount * session.orderProjectVO.supportPrice+session.orderProjectVO.freight}]]</span>
+                                            </h2></li>
+                                            <li
+                                                    style="margin-top: 10px; padding: 5px; border: 1px solid #F00; display: initial; background: #FFF;">
+                                                <i class="glyphicon glyphicon-info-sign"></i> <strong>您需要先
+                                                <a href="#address">设置配送信息</a> ,再提交订单
+                                            </strong>
+                                            </li>
+                                            <li style="margin-top: 10px;">
+                                                请在下单后15分钟内付款，否则您的订单会被自动关闭。
+                                            </li>
+                                            <li style="margin-top: 10px;">
+                                                <button id="payButton" disabled="disabled" type="button"
+                                                        class="btn btn-warning btn-lg">
+                                                    <i class="glyphicon glyphicon-credit-card"></i> 立即付款
+                                                </button>
+                                            </li>
+                                            <li style="margin-top: 10px;">
+                                                <div class="checkbox">
+                                                    <label>
+                                                        <input id="knowRoleCheckBox" type="checkbox">我已了解风险和规则
+                                                    </label>
+                                                </div>
+                                            </li>
+                                        </ul>
+
+
+                                    </div>
+                                </div>
+                                <div class="container">
+                                    <div class="row clearfix">
+                                        <div class="col-md-12 column">
+                                            <blockquote>
+                                                <p>
+                                                    <i class="glyphicon glyphicon-info-sign"
+                                                       style="color: #2a6496;"></i> 提示
+                                                </p>
+                                                <br> <span style="font-size: 12px;">1.众筹并非商品交易，存在一定风险。支持者根据自己的判断选择、支持众筹项目，与发起人共同实现梦想并获得发起人承诺的回报。<br>
+														2.众筹平台仅提供平台网络空间及技术支持等中介服务，众筹仅存在于发起人和支持者之间，使用众筹平台产生的法律后果由发起人与支持者自行承担。<br>
+														3.本项目必须在2017-06-04之前达到 ￥1000000.00
+														的目标才算成功，否则已经支持的订单将取消。订单取消或募集失败的，您支持的金额将原支付路径退回。<br>
+														4.请在支持项目后15分钟内付款，否则您的支持请求会被自动关闭。<br>
+														5.众筹成功后由发起人统一进行发货，售后服务由发起人统一提供；如果发生发起人无法发放回报、延迟发放回报、不提供回报后续服务等情况，您需要直接和发起人协商解决。<br>
+														6.如您不同意上述风险提示内容，您有权选择不支持；一旦选择支持，视为您已确认并同意以上提示内容。
+													</span>
+                                            </blockquote>
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="container" style="margin-top: 20px;">
+        <div class="row clearfix">
+            <div class="col-md-12 column">
+                <div id="footer">
+                    <div class="footerNav">
+                        <a rel="nofollow" href="http://www.atguigu.com">关于我们</a> | <a
+                            rel="nofollow" href="http://www.atguigu.com">服务条款</a> | <a
+                            rel="nofollow" href="http://www.atguigu.com">免责声明</a> | <a
+                            rel="nofollow" href="http://www.atguigu.com">网站地图</a> | <a
+                            rel="nofollow" href="http://www.atguigu.com">联系我们</a>
+                    </div>
+                    <div class="copyRight">Copyright ?2010-2014atguigu.com 版权所有
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+</div>
+<!-- /container -->
+
+<!-- 为了收集当前页面中的所有数据，构造空表单 -->
+<form id="summaryForm" action="pay/generate/order" method="post"></form>
+
+
+</body>
+</html>
+```
+
+
+
+### 6.5 追加代码: 获取用户的收货地址【`api` 工程】
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662562892028-2183653b-7154-4518-84c6-998da8c9aa4f.png)
+
+```java
+    /**
+     * 获取用户的收货地址
+     *
+     * @param memberId
+     * @return {@link ResultEntity}<{@link List}<{@link AddressVO}>>
+     */
+    @RequestMapping("/get/address/vo/list/remote")
+    ResultEntity<List<AddressVO>> getAddressVOListRemote(@RequestParam("memberId") Integer memberId);
+```
+
+### 6.6 追加代码【`mysql` 工程】
+
+- `OrderProviderHandler`
+
+```java
+    @RequestMapping("/get/address/vo/list/remote")
+    ResultEntity<List<AddressVO>> getAddressVOListRemote(@RequestParam("memberId") Integer memberId) {
+        try {
+            List<AddressVO> addressVOList = orderService.getAddressVOList(memberId);
+            return ResultEntity.successWithData(addressVOList);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResultEntity.failed(e.getMessage());
+        }
+    }
+```
+
+- `OrderService`
+
+```java
+    /**
+     * 获取用户的收货地址
+     *
+     * @param memberId
+     * @return {@link List}<{@link AddressVO}>
+     */
+    List<AddressVO> getAddressVOList(Integer memberId);
+```
+
+- `OrderServiceImpl`
+
+```java
+    @Override
+    public List<AddressVO> getAddressVOList(Integer memberId) {
+        return addressPOMapper.selectAddressVOList(memberId);
+    }
+```
+
+- `AddressPOMapper`
+
+```java
+    /**
+     * 查询用户的收货地址
+     *
+     * @param memberId 成员身份
+     * @return {@link List}<{@link AddressVO}>
+     */
+    List<AddressVO> selectAddressVOList(Integer memberId);
+```
+
+- `AddressPOMapper.xml`
+
+```xml
+    <select id="selectAddressVOList" resultType="com.atguigu.crowd.entity.vo.AddressVO">
+        select receive_name receiveName,
+               phone_num    phoneNum,
+               address,
+               member_id    memberId
+        from t_address
+        where member_id = #{memberId}
+    </select>
+```
+
+
+
+### 6.7 新增收货地址
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662653951804-f60903ed-f607-4c3c-9664-fd0430fb4448.png)
+
+#### 6.7.1 思路
+
+![img](https://cdn.nlark.com/yuque/__puml/20f231eeed4e4ef7ca78d3b85052e27c.svg)
+
+
+
+#### 6.7.2 发起请求
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662718145479-737590ba-b02b-4c80-ae66-3789d7ec0f84.png)
+
+```javascript
+$(function () {
+	$("#saveAddress").click(function () {
+	    // 收集所有要提交的表单项的数据
+	    var memberId = $("[name=memberId]").val();
+	    var receiveName = $.trim($("[name=receiveName]").val());
+	    var phoneNum = $.trim($("[name=phoneNum]").val());
+	    var address = $.trim($("[name=address]").val());
+	
+	    // 发起请求
+	    $.ajax({
+	        url: "order/save/address",
+	        type: "post",
+	        data: JSON.stringify({
+	            memberId,
+	            receiveName,
+	            phoneNum,
+	            address
+	        }),
+	        contentType: "application/json;charset=UTF-8",
+	        dataType: "json",
+	        success: function (response) {
+	            var result = response.result;
+	            if ("SUCCESS" === result) {
+	                var address = response.data;
+	                $("#showAddress").append(`
+	                            <div class="radio">
+	                                <label> <input type="radio" name="addressId" value="${address.id}"
+	                                               id="optionsRadios1"/> ${address.receiveName}
+	                                    ${address.phoneNum} ${address.address}
+	                                </label>
+	                            </div>`);
+	                layer.msg("新增收货地址成功!")
+	            }
+	
+	            if ("FAILED" === result) {
+	                layer.msg("保存收货地址失败, 请重试")
+	            }
+	        },
+	        error: function (response) {
+	            layer.msg(response.status + " " + response.statusText);
+	        }
+	    })
+	})
+})
+```
+
+
+
+#### 6.7.3 `OrderHandler` 远程调用接口
+
+- 追加代码
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662686297761-87d3e1ee-490c-4165-adb2-7df78815d7c8.png)
+
+```java
+    /**
+     * 首页 -> 项目详情（点击支持） -> 显示回报确认信息 -> 显示返回确认信息（收货地址, 点击确认配送信息）
+     *
+     * @param addressVO
+     * @return {@link ResultEntity}<{@link AddressVO}>
+     */
+    @ResponseBody
+    @RequestMapping("/save/address")
+    public ResultEntity<AddressVO> saveAddressPO(@RequestBody AddressVO addressVO) {
+        // 创建一个持久化对象
+        AddressPO addressPO = new AddressPO();
+        // 复制属性
+        BeanUtils.copyProperties(addressVO, addressPO);
+        // 保存
+        ResultEntity<AddressPO> resultEntity = mySQLRemoteService.saveAddressPORemote(addressPO);
+        if (ResultEntity.SUCCESS.equals(resultEntity.getResult())) {
+            // 执行成功， 复制持久化对象给视图对象并返回
+            // 保存成功会有一个 id 值, 所以要复制
+            BeanUtils.copyProperties(addressPO, addressVO);
+            return ResultEntity.successWithData(addressVO);
+        } else {
+            return ResultEntity.failed(resultEntity.getMessage());
+        }
+    }
+```
+
+- 声明接口【`api` 工程】
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662686380607-2f83f269-e077-4c81-a453-f3c9ed239d99.png)
+
+```java
+    /**
+     * 保存收货地址
+     *
+     * @param addressPO
+     * @return {@link ResultEntity}<{@link AddressPO}>
+     */
+    @RequestMapping("/save/address/po/remote")
+    ResultEntity<AddressPO> saveAddressPORemote(@RequestBody AddressPO addressPO);
+```
+
+
+
+#### 6.7.4 `OrderProviderHandler`: 保存收货地址【`mysql` 工程】
+
+- 追加代码
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662686461999-4ab4e2de-111d-4e8b-89db-644e6923517c.png)
+
+```java
+    public ResultEntity<AddressPO> saveAddressPORemote(@RequestBody AddressPO addressPO){
+        try {
+            orderService.saveAddressPO(addressPO);
+            return ResultEntity.successWithData(addressPO);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResultEntity.failed(e.getMessage());
+        }
+    }
+```
+
+- 声明接口
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662686573478-d385fc7a-051a-40d1-9aa0-9b97121b8564.png)
+
+```java
+    /**
+     * 保存收货地址
+     *
+     * @param addressPO
+     */
+    void saveAddressPO(AddressPO addressPO);
+```
+
+
+
+- 实现接口
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662686585965-b70d3114-00f5-4bb5-89ba-67c20d345747.png)
+
+```java
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    @Override
+    public void saveAddressPO(AddressPO addressPO) {
+        addressPOMapper.insert(addressPO);
+    }
+```
+
+
+
+- `Mapper` 接口
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662686622385-198b3dfa-42e2-4d2a-a01d-6c296b6b4e7e.png)
+
+```java
+    int insert(AddressPO record);
+```
+
+
+
+- `SQL`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662686655986-8ceffabc-9055-4a55-9c66-d9b33211f843.png)
+
+```xml
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" parameterType="com.atguigu.crowd.entity.po.AddressPO">
+        insert into t_address (id, receive_name, phone_num,
+                               address, member_id)
+        values (#{id,jdbcType=INTEGER}, #{receiveName,jdbcType=VARCHAR}, #{phoneNum,jdbcType=VARCHAR},
+                #{address,jdbcType=VARCHAR}, #{memberId,jdbcType=VARCHAR})
+    </insert>
+```
+
+
+
+#### 6.7.5 启用服务熔断机制【`mysql` 工程】
+
+1.  追加依赖
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662718738763-9300205b-e4bb-4e5e-874c-95a6eb44c849.png)
+
+```xml
+<!-- 整合 Hystrix -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-netflix-hystrix</artifactId>
+</dependency>
+```
+
+1. 开启断路器功能
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662691525085-fe909800-81e8-46f2-80d7-f10320de7572.png)
+
+```java
+package com.atguigu.crowd;
+
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.circuitbreaker.EnableCircuitBreaker;
+
+/**
+ * `@EnableCircuitBreaker`: 开启断路器功能
+ * 
+ * @author 陈江林
+ * @date 2022/8/19 05:02
+ */
+@EnableCircuitBreaker
+@MapperScan("com.atguigu.crowd.mapper")
+@SpringBootApplication
+public class CrowdMainClass {
+
+    public static void main(String[] args) {
+        SpringApplication.run(CrowdMainClass.class, args);
+    }
+
+}
+```
+
+1. 修改代码: `OrderProviderHandler`: 保存收货地址【`mysql` 工程】
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662718761183-ec26bf7c-ef7c-4475-8cd1-696cb8ccf842.png)
+
+```java
+    @HystrixCommand(fallbackMethod = "saveAddressPORemoteBackup")
+    @RequestMapping("/save/address/po/remote")
+    public ResultEntity<AddressPO> saveAddressPORemote(@RequestBody AddressPO addressPO){
+        try {
+            orderService.saveAddressPO(addressPO);
+            return ResultEntity.successWithData(addressPO);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResultEntity.failed(e.getMessage());
+        }
+    }
+
+    public ResultEntity<AddressPO> saveAddressPORemoteBackup(@RequestBody AddressPO addressPO){
+        return ResultEntity.failed(CrowdConstant.MESSAGE_HYSTRIX_BACKUP);
+    }
+```
+
+
+
+1. 追加代码
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662719594241-07dd2a12-45d6-4f73-a7d4-a348dce6f13d.png)
+
+```java
+public static final String MESSAGE_HYSTRIX_BACKUP = "熔断机制生效: 方法执行出现问题";
+```
+
+
+
+#### 6.7.6 启用服务降级机制
+
+1. 追加依赖【`api` 工程】
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662718779775-38d70866-f9e6-4283-b44f-c3384aa6a84e.png)
+
+```xml
+<!-- 整合 Hystrix -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-netflix-hystrix</artifactId>
+</dependency>
+```
+
+1. 新建 `MySQLFallBackFactory`【`api` 工程】
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662692962241-c85ce7d3-04e9-4c4b-ba83-5b0f9148a7e4.png)
+
+```java
+package com.atguigu.crowd.factory;
+
+import com.atguigu.crowd.api.MySQLRemoteService;
+import com.atguigu.crowd.entity.po.AddressPO;
+import com.atguigu.crowd.entity.po.MemberPO;
+import com.atguigu.crowd.entity.vo.*;
+import com.atguigu.crowd.util.ResultEntity;
+import feign.hystrix.FallbackFactory;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+/**
+ * @author 陈江林
+ * @date 2022/9/9 11:06
+ */
+@Component
+public class MySQLFallBackFactory implements FallbackFactory<MySQLRemoteService> {
+
+    @Override
+    public MySQLRemoteService create(Throwable cause) {
+        return new MySQLRemoteService() {
+            @Override
+            public ResultEntity<MemberPO> getMemberPOByLoginAcctRemote(String loginacct) {
+                return ResultEntity.failed("降级机制生效: " + cause.getMessage());
+            }
+
+            @Override
+            public ResultEntity<String> saveMember(MemberPO memberPO) {
+                return ResultEntity.failed("降级机制生效: " + cause.getMessage());
+            }
+
+            @Override
+            public ResultEntity<String> saveProjectVORemote(ProjectVO projectVO, Integer memberId) {
+                return ResultEntity.failed("降级机制生效: " + cause.getMessage());
+            }
+
+            @Override
+            public ResultEntity<List<PortalTypeVO>> getPortalTypeProjectDataRemote() {
+                return ResultEntity.failed("降级机制生效: " + cause.getMessage());
+            }
+
+            @Override
+            public ResultEntity<DetailProjectVO> getDetailProjectVORemote(Integer projectId) {
+                return ResultEntity.failed("降级机制生效: " + cause.getMessage());
+            }
+
+            @Override
+            public ResultEntity<OrderProjectVO> getOrderProjectVORemote(Integer returnId) {
+                return ResultEntity.failed("降级机制生效: " + cause.getMessage());
+            }
+
+            @Override
+            public ResultEntity<List<AddressVO>> getAddressVOListRemote(Integer memberId) {
+                return ResultEntity.failed("降级机制生效: " + cause.getMessage());
+            }
+
+            @Override
+            public ResultEntity<AddressPO> saveAddressPORemote(AddressPO addressPO) {
+                return ResultEntity.failed("降级机制生效: " + cause.getMessage());
+            }
+        };
+    }
+
+}
+```
+
+1. 追加代码
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662697390110-649a2213-7b76-4326-a030-e17fbd8fe77d.png)
+
+```java
+@FeignClient(value = "atguigu-crowd-mysql", fallbackFactory = MySQLFallBackFactory.class)
+public interface MySQLRemoteService {
+}
+```
+
+1. 追加配置【`order` 工程】
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662693132577-8c51e8b3-ee98-4364-8cb4-4d5d34b6dc62.png)
+
+```yaml
+feign:
+  hystrix:
+    # 使用 Hystrix 断路器
+    enabled: true
+```
+
+
+
+
+
+## 7. `Hystrix` 扩展
+
+### 7.1 服务熔断机制
+
+#### 7.1.1 `MemberProviderHandler` 的
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662699339886-b92b88d6-edc1-450a-b97c-c8739db548cb.png)
+
+```java
+package com.atguigu.crowd.handler;
+
+import com.atguigu.crowd.constant.CrowdConstant;
+import com.atguigu.crowd.entity.po.MemberPO;
+import com.atguigu.crowd.service.api.MemberService;
+import com.atguigu.crowd.util.ResultEntity;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * @author 陈江林
+ * @date 2022/8/19 09:11
+ */
+@RestController
+public class MemberProviderHandler {
+
+    @Autowired
+    private MemberService memberService;
+
+    @HystrixCommand(fallbackMethod = "getMemberPOByLoginAcctRemoteBackup")
+    @RequestMapping("/get/memberpo/login/acct/remote")
+    public ResultEntity<MemberPO> getMemberPOByLoginAcctRemote(@RequestParam("loginacct") String loginacct) {
+        try {
+            // 调用本地 Service 完成查询
+            MemberPO memberPO = memberService.getMemberPOByLoginAcct(loginacct);
+            // 如果没有抛异常, 那么就返回成功的结果
+            return ResultEntity.successWithData(memberPO);
+        } catch (Exception e) {
+            // 如果捕获到异常则返回失败的结果
+            return ResultEntity.failed(e.getMessage());
+        }
+    }
+
+    public ResultEntity<MemberPO> getMemberPOByLoginAcctRemoteBackup(@RequestParam("loginacct") String loginacct) {
+        return ResultEntity.failed(CrowdConstant.MESSAGE_HYSTRIX_BACKUP);
+    }
+
+    /**
+     * 保存
+     *
+     * @param memberPO 会员实体类
+     * @return
+     */
+    @HystrixCommand(fallbackMethod = "saveMemberBackup")
+    @RequestMapping("/save/member/remote")
+    public ResultEntity<String> saveMember(@RequestBody MemberPO memberPO) {
+        try {
+            memberService.saveMember(memberPO);
+            return ResultEntity.successWithoutData();
+        } catch (Exception e) {
+            if (e instanceof DuplicateKeyException) {
+                return ResultEntity.failed(CrowdConstant.MESSAGE_LOGIN_ACCT_ALREADY_IN_USE);
+            }
+
+            return ResultEntity.failed(e.getMessage());
+        }
+    }
+
+    public ResultEntity<String> saveMemberBackup(@RequestBody MemberPO memberPO) {
+        return ResultEntity.failed(CrowdConstant.MESSAGE_HYSTRIX_BACKUP);
+    }
+
+}
+```
+
+
+
+#### 7.1.2 `OrderProviderHandler`的
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662718672237-46ea1f3d-b676-4c79-a0fa-e90ecb60e2d6.png)
+
+```java
+package com.atguigu.crowd.handler;
+
+import com.atguigu.crowd.constant.CrowdConstant;
+import com.atguigu.crowd.entity.po.AddressPO;
+import com.atguigu.crowd.entity.vo.AddressVO;
+import com.atguigu.crowd.entity.vo.OrderProjectVO;
+import com.atguigu.crowd.service.api.OrderService;
+import com.atguigu.crowd.util.ResultEntity;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * @author 陈江林
+ * @date 2022/9/7 20:15
+ */
+@RestController
+public class OrderProviderHandler {
+
+    @Autowired
+    private OrderService orderService;
+
+    @HystrixCommand(fallbackMethod = "getOrderProjectVORemoteBackup")
+    @RequestMapping("/get/order/project/vo/remote/{returnId}")
+    ResultEntity<OrderProjectVO> getOrderProjectVORemote(@PathVariable("returnId") Integer returnId) {
+        try {
+            OrderProjectVO orderProjectVO = orderService.getOrderProjectVO(returnId);
+            return ResultEntity.successWithData(orderProjectVO);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResultEntity.failed(e.getMessage());
+        }
+    }
+
+    ResultEntity<OrderProjectVO> getOrderProjectVORemoteBackup(@PathVariable("returnId") Integer returnId) {
+        return ResultEntity.failed(CrowdConstant.MESSAGE_HYSTRIX_BACKUP);
+    }
+
+    @HystrixCommand(fallbackMethod = "getAddressVOListRemoteBackup")
+    @RequestMapping("/get/address/vo/list/remote")
+    ResultEntity<List<AddressVO>> getAddressVOListRemote(@RequestParam("memberId") Integer memberId) {
+        try {
+            List<AddressVO> addressVOList = orderService.getAddressVOList(memberId);
+            return ResultEntity.successWithData(addressVOList);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResultEntity.failed(e.getMessage());
+        }
+    }
+
+    ResultEntity<List<AddressVO>> getAddressVOListRemoteBackup(@RequestParam("memberId") Integer memberId) {
+        return ResultEntity.failed(CrowdConstant.MESSAGE_HYSTRIX_BACKUP);
+    }
+
+    @HystrixCommand(fallbackMethod = "saveAddressPORemoteBackup")
+    @RequestMapping("/save/address/po/remote")
+    public ResultEntity<AddressPO> saveAddressPORemote(@RequestBody AddressPO addressPO){
+        try {
+            orderService.saveAddressPO(addressPO);
+            return ResultEntity.successWithData(addressPO);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResultEntity.failed(e.getMessage());
+        }
+    }
+
+    public ResultEntity<AddressPO> saveAddressPORemoteBackup(@RequestBody AddressPO addressPO){
+        return ResultEntity.failed(CrowdConstant.MESSAGE_HYSTRIX_BACKUP);
+    }
+
+}
+```
+
+
+
+#### 7.1.3 `ProjectProviderHandler` 的
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662718681948-b86b8d83-45c9-4222-a39e-642c0caaa778.png)
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662699360510-d8849288-0cb0-4251-9492-2855b3cf966f.png)
+
+```java
+package com.atguigu.crowd.handler;
+
+import com.atguigu.crowd.constant.CrowdConstant;
+import com.atguigu.crowd.entity.vo.DetailProjectVO;
+import com.atguigu.crowd.entity.vo.PortalTypeVO;
+import com.atguigu.crowd.entity.vo.ProjectVO;
+import com.atguigu.crowd.service.api.ProjectService;
+import com.atguigu.crowd.util.ResultEntity;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * @author 陈江林
+ * @date 2022/8/31 11:49
+ */
+@RestController
+public class ProjectProviderHandler {
+
+    @Autowired
+    private ProjectService projectService;
+
+    /**
+     * 保存会员发起的众筹信息
+     *
+     * @param projectVO 众筹信息
+     * @param memberId  会员 id
+     * @return
+     */
+    @HystrixCommand(fallbackMethod = "saveProjectVORemoteBackup")
+    @RequestMapping("/save/project/vo/remote")
+    public ResultEntity<String> saveProjectVORemote(@RequestBody ProjectVO projectVO, @RequestParam("memberId") Integer memberId) {
+        try {
+            projectService.saveProject(projectVO, memberId);
+            return ResultEntity.successWithoutData();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResultEntity.failed(e.getMessage());
+        }
+    }
+
+    public ResultEntity<String> saveProjectVORemoteBackup(@RequestBody ProjectVO projectVO, @RequestParam("memberId") Integer memberId) {
+        return ResultEntity.failed(CrowdConstant.MESSAGE_HYSTRIX_BACKUP);
+    }
+
+    @HystrixCommand(fallbackMethod = "getPortalTypeProjectDataRemoteBackup")
+    @RequestMapping("/get/portal/type/project/data/remote")
+    public ResultEntity<List<PortalTypeVO>> getPortalTypeProjectDataRemote() {
+
+        try {
+            List<PortalTypeVO> portalTypeVOList = projectService.getPortalTypeVO();
+            return ResultEntity.successWithData(portalTypeVOList);
+        } catch (Exception e) {
+            return ResultEntity.failed(e.getMessage());
+        }
+
+    }
+
+    public ResultEntity<List<PortalTypeVO>> getPortalTypeProjectDataRemoteBackup() {
+        return ResultEntity.failed(CrowdConstant.MESSAGE_HYSTRIX_BACKUP);
+    }
+
+    @HystrixCommand(fallbackMethod = "getDetailProjectVORemoteBackup")
+    @RequestMapping("/get/project/detail/remote/{projectId}")
+    ResultEntity<DetailProjectVO> getDetailProjectVORemote(@PathVariable("projectId") Integer projectId) {
+
+        try {
+            DetailProjectVO detailProjectVOById = projectService.getDetailProjectVO(projectId);
+            return ResultEntity.successWithData(detailProjectVOById);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResultEntity.failed(e.getMessage());
+        }
+
+    }
+
+    ResultEntity<DetailProjectVO> getDetailProjectVORemoteBackup(@PathVariable("projectId") Integer projectId) {
+        return ResultEntity.failed(CrowdConstant.MESSAGE_HYSTRIX_BACKUP);
+    }
+
+}
+```
+
+
+
+#### 7.1.4 `redis` 工程整合 `Hystrix`
+
+1. 追加依赖
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662719291623-43379379-828f-4cd3-92c9-f71836d00a35.png)
+
+```xml
+<!-- 整合 Hystrix -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-netflix-hystrix</artifactId>
+</dependency>
+```
+
+1. 开启断路器， 修改 `CrowdMainClass`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662719277517-e5ffa535-d816-4353-abe6-d150f6ffb48b.png)
+
+```java
+package com.atguigu.crowd;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.circuitbreaker.EnableCircuitBreaker;
+
+/**
+ * `@EnableCircuitBreaker`: 开启断路器功能
+ *
+ * @author 陈江林
+ * @date 2022/8/19 11:05
+ */
+@EnableCircuitBreaker
+@SpringBootApplication
+public class CrowdMainClass {
+
+    public static void main(String[] args) {
+        SpringApplication.run(CrowdMainClass.class, args);
+    }
+
+}
+```
+
+
+
+1. 修改 `RedisHandler`
+
+```java
+package com.atguigu.crowd.handler;
+
+import com.atguigu.crowd.constant.CrowdConstant;
+import com.atguigu.crowd.util.ResultEntity;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.concurrent.TimeUnit;
+
+/**
+ * @author 陈江林
+ * @date 2022/8/28 21:39
+ */
+@RestController
+public class RedisHandler {
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+
+    /**
+     * 保存
+     *
+     * @param key
+     * @param value
+     * @return
+     */
+    @HystrixCommand(fallbackMethod = "setRedisKeyValueRemoteBackup")
+    @RequestMapping("/set/redis/key/value/remote")
+    public ResultEntity<String> setRedisKeyValueRemote(
+            @RequestParam("key") String key,
+            @RequestParam("value") String value) {
+        try {
+            ValueOperations<String, String> operations = redisTemplate.opsForValue();
+            operations.set(key, value);
+
+            return ResultEntity.successWithoutData();
+        } catch (Exception e) {
+            return ResultEntity.failed(e.getMessage());
+        }
+    }
+
+    public ResultEntity<String> setRedisKeyValueRemoteBackup(
+            @RequestParam("key") String key,
+            @RequestParam("value") String value) {
+        return ResultEntity.failed(CrowdConstant.MESSAGE_HYSTRIX_BACKUP);
+    }
+
+    /**
+     * 设置带超时时间的
+     *
+     * @param key
+     * @param value
+     * @param time     时间
+     * @param timeUnit 时间单位
+     * @return
+     */
+    @HystrixCommand(fallbackMethod = "setRedisKeyValueRemoteWithTimeoutBackup")
+    @RequestMapping("/set/redis/key/value/remote/with/timeout")
+    public ResultEntity<String> setRedisKeyValueRemoteWithTimeout(
+            @RequestParam("key") String key,
+            @RequestParam("value") String value,
+            @RequestParam("time") long time,
+            @RequestParam("timeUnit") TimeUnit timeUnit) {
+        try {
+            ValueOperations<String, String> operations = redisTemplate.opsForValue();
+            operations.set(key, value, time, timeUnit);
+
+            return ResultEntity.successWithoutData();
+        } catch (Exception e) {
+            return ResultEntity.failed(e.getMessage());
+        }
+    }
+
+    public ResultEntity<String> setRedisKeyValueRemoteWithTimeoutBackup(
+            @RequestParam("key") String key,
+            @RequestParam("value") String value,
+            @RequestParam("time") long time,
+            @RequestParam("timeUnit") TimeUnit timeUnit) {
+        return ResultEntity.failed(CrowdConstant.MESSAGE_HYSTRIX_BACKUP);
+    }
+    
+    /**
+     * 根据 Key 获取
+     *
+     * @param key
+     * @return
+     */
+    @HystrixCommand(fallbackMethod = "getRedisKeyValueByKeyBackup")
+    @RequestMapping("get/redis/key/value/by/key")
+    public ResultEntity<String> getRedisKeyValueByKey(@RequestParam("key") String key) {
+        try {
+            ValueOperations<String, String> operations = redisTemplate.opsForValue();
+            String value = operations.get(key);
+
+            return ResultEntity.successWithData(value);
+        } catch (Exception e) {
+            return ResultEntity.failed(e.getMessage());
+        }
+    }
+
+    public ResultEntity<String> getRedisKeyValueByKeyBackup(@RequestParam("key") String key) {
+        return ResultEntity.failed(CrowdConstant.MESSAGE_HYSTRIX_BACKUP);
+    }
+
+    /**
+     * 根据 Key 删除
+     *
+     * @param key
+     * @return
+     */
+    @HystrixCommand(fallbackMethod = "removeRedisKeyRemoteBackup")
+    @RequestMapping("remove/redis/key/remote")
+    public ResultEntity<String> removeRedisKeyRemote(@RequestParam("key") String key) {
+        try {
+            redisTemplate.delete(key);
+
+            return ResultEntity.successWithoutData();
+        } catch (Exception e) {
+            return ResultEntity.failed(e.getMessage());
+        }
+    }
+
+    public ResultEntity<String> removeRedisKeyRemoteBackup(@RequestParam("key") String key) {
+        return ResultEntity.failed(CrowdConstant.MESSAGE_HYSTRIX_BACKUP);
+    }
+    
+}
+```
+
+
+
+### 7.2 服务降级机制
+
+1. 追加配置【`auth` 工程】和【`project`工程】
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662699530657-7a4b9f12-a3ee-4ad8-9dd5-3765d0f9bfb6.png)
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662699553501-c6d5e3f2-a7c2-492b-b27c-6ea48cf9ed73.png)
+
+```yaml
+feign:
+  hystrix:
+    # 使用 Hystrix 断路器
+    enabled: true
+```
+
+
+
+#### 7.2.1 新建 `RedisFallBackFactory`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662698451200-749d530a-fa0d-4d24-bd8f-7cdcb781ca03.png)
+
+```java
+package com.atguigu.crowd.factory;
+
+import com.atguigu.crowd.api.RedisRemoteService;
+import com.atguigu.crowd.util.ResultEntity;
+import feign.hystrix.FallbackFactory;
+import org.springframework.stereotype.Component;
+
+import java.util.concurrent.TimeUnit;
+
+/**
+ * @author 陈江林
+ * @date 2022/9/9 12:39
+ */
+@Component
+public class RedisFallBackFactory implements FallbackFactory<RedisRemoteService> {
+
+    @Override
+    public RedisRemoteService create(Throwable cause) {
+        return new RedisRemoteService() {
+            @Override
+            public ResultEntity<String> setRedisKeyValueRemote(String key, String value) {
+                return ResultEntity.failed("降级机制生效: " + cause.getMessage());
+            }
+
+            @Override
+            public ResultEntity<String> setRedisKeyValueRemoteWithTimeout(String key, String value, long time, TimeUnit timeUnit) {
+                return ResultEntity.failed("降级机制生效: " + cause.getMessage());
+            }
+
+            @Override
+            public ResultEntity<String> getRedisKeyValueByKey(String key) {
+                return ResultEntity.failed("降级机制生效: " + cause.getMessage());
+            }
+
+            @Override
+            public ResultEntity<String> removeRedisKeyRemote(String key) {
+                return ResultEntity.failed("降级机制生效: " + cause.getMessage());
+            }
+        };
+    }
+
+}
+```
+
+#### 7.2.2 使用 `RedisFallBackFactory`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662698516382-b079754d-2271-4154-8bf3-7f63473fa7c6.png)
+
+```java
+@FeignClient(value = "atguigu-crowd-redis", fallbackFactory = RedisFallBackFactory.class)
+public interface RedisRemoteService {
+}
+```

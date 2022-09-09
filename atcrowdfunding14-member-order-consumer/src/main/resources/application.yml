@@ -1,9 +1,9 @@
 server:
-  port: 4000
+  port: 6000
 
 spring:
   application:
-    name: atguigu-crowd-auth
+    name: atguigu-crowd-order
   session:
     store-type: redis
 
@@ -17,14 +17,6 @@ ribbon:
   ReadTimeout: 10000
   # 10秒 - 连接建立的超时时长，默认5秒
   ConnectTimeout: 10000
-
-# 第三方短信接口
-short:
-  message:
-    app-code: 1948fa6afc674ea3bc2fea47f36e1108
-    host: https://dfsns.market.alicloudapi.com
-    path: /data/send_sms
-    method: POST
 
 feign:
   hystrix:

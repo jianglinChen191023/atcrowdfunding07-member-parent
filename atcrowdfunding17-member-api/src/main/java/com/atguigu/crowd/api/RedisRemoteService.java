@@ -1,5 +1,6 @@
 package com.atguigu.crowd.api;
 
+import com.atguigu.crowd.factory.RedisFallBackFactory;
 import com.atguigu.crowd.util.ResultEntity;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -11,7 +12,7 @@ import java.util.concurrent.TimeUnit;
  * @author 陈江林
  * @date 2022/8/28 21:30
  */
-@FeignClient("atguigu-crowd-redis")
+@FeignClient(value = "atguigu-crowd-redis", fallbackFactory = RedisFallBackFactory.class)
 public interface RedisRemoteService {
 
     /**

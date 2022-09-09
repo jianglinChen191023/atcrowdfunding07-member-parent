@@ -4,6 +4,7 @@ import com.atguigu.crowd.constant.CrowdConstant;
 import com.atguigu.crowd.entity.po.MemberPO;
 import com.atguigu.crowd.service.api.MemberService;
 import com.atguigu.crowd.util.ResultEntity;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,6 +22,7 @@ public class MemberProviderHandler {
     @Autowired
     private MemberService memberService;
 
+    @HystrixCommand(fallbackMethod = "getMemberPOByLoginAcctRemoteBackup")
     @RequestMapping("/get/memberpo/login/acct/remote")
     public ResultEntity<MemberPO> getMemberPOByLoginAcctRemote(@RequestParam("loginacct") String loginacct) {
         try {
@@ -34,12 +36,17 @@ public class MemberProviderHandler {
         }
     }
 
+    public ResultEntity<MemberPO> getMemberPOByLoginAcctRemoteBackup(@RequestParam("loginacct") String loginacct) {
+        return ResultEntity.failed(CrowdConstant.MESSAGE_HYSTRIX_BACKUP);
+    }
+
     /**
      * 保存
      *
      * @param memberPO 会员实体类
      * @return
      */
+    @HystrixCommand(fallbackMethod = "saveMemberBackup")
     @RequestMapping("/save/member/remote")
     public ResultEntity<String> saveMember(@RequestBody MemberPO memberPO) {
         try {
@@ -53,4 +60,9 @@ public class MemberProviderHandler {
             return ResultEntity.failed(e.getMessage());
         }
     }
+
+    public ResultEntity<String> saveMemberBackup(@RequestBody MemberPO memberPO) {
+        return ResultEntity.failed(CrowdConstant.MESSAGE_HYSTRIX_BACKUP);
+    }
+
 }

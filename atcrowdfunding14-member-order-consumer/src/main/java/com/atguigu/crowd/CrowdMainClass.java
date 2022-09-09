@@ -2,15 +2,13 @@ package com.atguigu.crowd;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.cloud.client.circuitbreaker.EnableCircuitBreaker;
+import org.springframework.cloud.openfeign.EnableFeignClients;
 
 /**
- * `@EnableCircuitBreaker`: 开启断路器功能
- *
  * @author 陈江林
- * @date 2022/8/19 11:05
+ * @date 2022/9/7 17:13
  */
-@EnableCircuitBreaker
+@EnableFeignClients
 @SpringBootApplication
 public class CrowdMainClass {
 
