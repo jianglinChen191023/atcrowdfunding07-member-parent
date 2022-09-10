@@ -1,0 +1,35 @@
+server:
+  port: 7000
+
+spring:
+  application:
+    name: atguigu-crowd-pay
+  session:
+    store-type: redis
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:1000/eureka
+
+ribbon:
+  # 10秒 - 处理请求的超时时间，默认为5秒
+  ReadTimeout: 10000
+  # 10秒 - 连接建立的超时时长，默认5秒
+  ConnectTimeout: 10000
+
+feign:
+  hystrix:
+    # 使用 Hystrix 断路器
+    enabled: true
+
+ali:
+  pay:
+    alipay-public-key: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoauF73gbBsJVQkFK/gmmVOWzYevEJZyPozl9L/49MvZKgo9oVOniBIJZq3+/ve6UZUKxLhKGFekP7mCsqMP3J+dr/a12gcVeBX8mu8J6ArwJnQ+pNsbZl9/dlpaob7qEGPd4gCZyr4J31ejpHrFJZBrUeHMtp3bo41YlMa7EKq4eoI8o8nm8yLFedtmtE5/LlY1uj3W0n6ZTGMjGfAOBQSICeoEJZPH+9u/NkLC/2FhRNNMwEAyp0xYQ3AjlX93GFL5F/1nc56oXDzpcIVzBXW+RP8Of1ISwFiXw6qF/P+zXLUNFmjDh03bJrdHoYuvS/Xygs53gwLYFIF+Qdo1KBwIDAQAB
+    app-id: 2016100100642012
+    charset: utf-8
+    gateway-url: https://openapi.alipaydev.com/gateway.do
+    merchant-private-key: MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCSW8OKd+By+Ea7UP9yCbWtlhvr7QvgAfiG9joMwbZ+Zma2/YMOWaAPD6NowrnaNaNd9gWZB/qJ1oe5QAXUi4bi/J1n+1+T1giRSaFtpkfDeRBvKmTiSyYCeGk7aeT0FWODWQB7ZnPD9R6KCeJCVhzN2YmurNFHftiM1fFcRHUNb5Daw0m7xKrOebQwMIk7K3at5a/Yd5nMUcOqoUOKTXMjxXSW6CnFXMCirPhg/e5aAMD+GiOUOIKx/DTtnZjVBv5UF0MJ7Xg1/wtrkHi4k3ZPLwJdMjv4UOH9377BbGFkyc0/0PJPhG69TqyyOInUCDNDyhzaYpH423GhlJy4uywrAgMBAAECggEAenw/jp+6gJ1VnKgxz/9eQ3Lv1SdiG8uqcVCZzllD4E7UwWoyhwzszg35ZNAqd/sRyK3/i03JGBgpKBjziCho74gYN5CBMZkbPHQRnFFfl7C210H0ggoAOmsJLob17GwGB0OyCpP4aFO4hi+1Ymzs2D2pYz0QPDRlCKB3yQ8louKjlykGSWwo58zwm935BHvv//JijHGbMbqDJGMfj/ogjhDP0txE7ZBiO9sEc1RjZ5Csg/81H8XSXCGyMowTX+I2M2ys59HMiuZFLM3pG5/UfOkqGKEJcv/ymsKILgL5h2XvLIFbgUqG4WMmHAX+moApnqmnkOtvSnE1u9hnBIkE+QKBgQDuerisalgfDlJ4wn3A7yQyX4cbT3ozLmqo/FZrlrd/ZJ/HgFrGBiEjaSxWRUxVUBGOgyQszOCzvhPySJjW6Y+xcai1MpC0z9fnvbpFM5GVVKUDIIA//O8+Ukd7wZyW20jebeFNk9I/kTAHs751wSJ8x60OET34r+ESk6aV+9xMDQKBgQCdHHK2XKgbUb+LtM0BUDq4KzPWW3/XYMrKpazDjwB+z2XWJSzch4nXyEa/8QAnUI3Atyn0fK1BmfyvFFtHpQtUpMUKtsswz9+RLwFrFrMspl3POlQEaU32fzl/RL7mybZyt71Mqcgq41DAtrVcyXWhgU1x6XrHcCxwZ0LROsDzFwKBgEolLbWteqhtM4cIMUEDGSXwPXloRH4VOGRB0DyzJ2ocRvEoHxDiZvszf+1yrkD4G/1LGLw1FsfLmTgDCkIHa/2ncOSlTAhrdp0+h+NsHR9oqcVHHZjHczrVKhR4Jc9hbk55q0sLYpsQ8PX0FItX+PkCu/NbuQDQ7hFwhqKrI9shAoGADU9LqIdQ9n+Gap92fpX9Y3zFd3No8SYSB/jhGfATaqrHRc0Ab+5Ljyw4UipoiOwaFiluNHgbdWNGNM7UrM0emJ0c1DuIGyqBFhuVUy0pIK83Y0bdt0H0iN1eUZnRUlvkSPOn5ca8XmXDgY/47VNj07rQhMXy0NJ/8UXOM0t27SECgYEAxERMjSKIjJ4VRcVcroBzdXZ2O3Pj9r1BLkyY8qKmptYvA+yinVWvvVzwjoHqLoqEkVZMq2ixrLYt7sl3esfGyUIdxjXUI1cbvCOpbDe7f0kJxvXyldC5Lrtama5gdJE36JFGbWrf2PRg4in1sizMjyY8G/SDMS0MNKpzos4pASQ=
+    notify-url: http://175.178.174.83/pay/notify
+    return-url: http://175.178.174.83/pay/return
+    sign-type: RSA2

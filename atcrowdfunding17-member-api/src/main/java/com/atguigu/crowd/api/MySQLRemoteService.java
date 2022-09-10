@@ -92,4 +92,12 @@ public interface MySQLRemoteService {
     @RequestMapping("/save/address/po/remote")
     ResultEntity<AddressPO> saveAddressPORemote(@RequestBody AddressPO addressPO);
 
+    /**
+     * 保存订单
+     *
+     * @param orderVO
+     * @return {@link ResultEntity}<{@link String}>
+     */
+    @RequestMapping("/save/order/remote")
+    ResultEntity<String> saveOrderRemote(@RequestBody OrderVO orderVO);
 }

@@ -27,6 +27,9 @@ zuul:
     crowd-order:
       service-id: atguigu-crowd-order
       path: /order/**
+    crowd-pay:
+      service-id: atguigu-crowd-pay
+      path: /pay/**
 
 ribbon:
   # 10秒 - 处理请求的超时时间，默认为5秒

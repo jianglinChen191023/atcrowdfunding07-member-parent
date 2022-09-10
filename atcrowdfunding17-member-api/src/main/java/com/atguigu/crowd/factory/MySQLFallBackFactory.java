@@ -59,6 +59,11 @@ public class MySQLFallBackFactory implements FallbackFactory<MySQLRemoteService>
             public ResultEntity<AddressPO> saveAddressPORemote(AddressPO addressPO) {
                 return ResultEntity.failed("降级机制生效: " + cause.getMessage());
             }
+
+            @Override
+            public ResultEntity<String> saveOrderRemote(OrderVO orderVO) {
+                return ResultEntity.failed("降级机制生效: " + cause.getMessage());
+            }
         };
     }
 

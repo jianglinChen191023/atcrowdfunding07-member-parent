@@ -346,6 +346,33 @@
             - [7.2.1 新建 `RedisFallBackFactory`](#721-新建-redisfallbackfactory)
             - [7.2.2 使用 `RedisFallBackFactory`](#722-使用-redisfallbackfactory)
 
+- [二十四 前台-支付](#二十四-前台-支付)
+    - [1. 思路](#1-思路)
+    - [2. 操作一: 搭建 `pay` 工程环境](#2-操作一-搭建-pay-工程环境)
+        - [2.1 追加依赖和插件](#21-追加依赖和插件)
+        - [2.2 新建 `CrowdMainClass`](#22-新建-crowdmainclass)
+        - [2.3 新建 `PayProperties`](#23-新建-payproperties)
+        - [2.4 新建 `application.yml`](#24-新建-applicationyml)
+        - [2.5 新建 `OrderVO`【`entity` 工程】](#25-新建-ordervoentity-工程)
+        - [2.6 追加路由规则【`zuul`工程】](#26-追加路由规则zuul工程)
+    - [3. 操作二: 提交订单表单](#3-操作二-提交订单表单)
+        - [3.1 提交表单 <关键代码>](#31-提交表单-关键代码)
+        - [3.2 调用支付接口](#32-调用支付接口)
+            - [3.2.1 新建 `PayHandler`](#321-新建-payhandler)
+            - [3.2.2 `out_trade_no`（商户订单号）参数说明](#322-out_trade_no商户订单号参数说明)
+    - [4. 操作三: `returnUrl`方法](#4-操作三-returnurl方法)
+        - [4.1 追加代码](#41-追加代码)
+    - [5. 操作四: `notifyUrl`方法](#5-操作四-notifyurl方法)
+        - [5.1 追加代码](#51-追加代码)
+        - [5.2 触发通知类型](#52-触发通知类型)
+    - [6. 操作五: 订单信息保存到数据库](#6-操作五-订单信息保存到数据库)
+        - [6.1 思路](#61-思路)
+        - [6.2 `return` 方法](#62-return-方法)
+        - [6.3 声明接口](#63-声明接口)
+            - [6.3.1 对应的降级机制](#631-对应的降级机制)
+        - [6.4 追加代码【`mysql` 工程】](#64-追加代码mysql-工程)
+
+
 
 
 # 十六 会员系统-搭建环境
@@ -16922,4 +16949,781 @@ public class RedisFallBackFactory implements FallbackFactory<RedisRemoteService>
 @FeignClient(value = "atguigu-crowd-redis", fallbackFactory = RedisFallBackFactory.class)
 public interface RedisRemoteService {
 }
+```
+
+
+# 二十四 前台-支付
+
+```
+git checkout -b 24.0.0_pay
+```
+
+
+
+## 1. 思路
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662729509855-c54a3688-fe84-4b43-895e-27d5b4a73153.png)
+
+## 2. 操作一: 搭建 `pay` 工程环境
+
+### 2.1 追加依赖和插件
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662798182722-a79cc241-2cab-4342-95cf-14f8f09f3657.png)
+
+```xml
+    <dependencies>
+        <!-- 支付宝 Alipay SDK -->
+        <dependency>
+            <groupId>com.alipay.sdk</groupId>
+            <artifactId>alipay-sdk-java</artifactId>
+            <version>4.33.39.ALL</version>
+        </dependency>
+        <dependency>
+            <groupId>com.atguigu.crowd</groupId>
+            <artifactId>atcrowdfunding17-member-api</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+        <!-- 导入配置文件处理器, 配置文件进行绑定 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!-- 对外暴露服务 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!-- 整合视图 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+        <!-- 作为客户端访问 Eureka 注册中心 -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+        <!-- SpringBoot 测试 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- 引入 SpringBoot & Redis 场景 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <!-- 引入 SpringBoot & SpringSession 场景 -->
+        <dependency>
+            <groupId>org.springframework.session</groupId>
+            <artifactId>spring-session-data-redis</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- 这个插件将 SpringBoot 应用打包成一个可执行的 jar 包 -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+```
+
+
+
+### 2.2 新建 `CrowdMainClass`
+
+```java
+package com.atguigu.crowd;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.openfeign.EnableFeignClients;
+
+/**
+ * @author 陈江林
+ * @date 2022/9/10 16:23
+ */
+@EnableFeignClients
+@SpringBootApplication
+public class CrowdMainClass {
+
+    public static void main(String[] args) {
+        SpringApplication.run(CrowdMainClass.class, args);
+    }
+
+}
+```
+
+### 2.3 新建 `PayProperties`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662814685128-fc0fc509-2249-4700-8348-0660eaa8440a.png)
+
+```java
+package com.atguigu.crowd.config;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
+
+/**
+ * @author 陈江林
+ * @date 2022/9/10 17:42
+ */
+@NoArgsConstructor
+@AllArgsConstructor
+@Data
+@Component
+@ConfigurationProperties(prefix = "ali.pay")
+public class PayProperties {
+
+    /**
+     * 支付宝公钥
+     */
+    private String alipayPublicKey;
+
+    /**
+     * 应用 ID
+     */
+    private String appId;
+
+    /**
+     * 字符编码格式
+     */
+    private String charset;
+
+    /**
+     * 支付宝网关（沙箱环境）
+     */
+    private String gatewayUrl;
+
+    /**
+     * 商户私钥
+     */
+    private String merchantPrivateKey;
+
+    /**
+     * 支付宝服务器主动通知商户服务器里指定的页面 http/https 路径
+     * 交易成功后，支付宝通过 post 请求 notifyUrl（商户入参传入），返回异步通知参数。
+     */
+    private String notifyUrl;
+
+    /**
+     * 用户确认支付后，支付宝通过 get 请求 returnUrl（商户入参传入），返回同步返回参数。
+     */
+    private String returnUrl;
+
+    /**
+     * 签名方式
+     */
+    private String signType;
+
+}
+```
+
+
+
+### 2.4 新建 `application.yml`
+
+```yaml
+server:
+  port: 7000
+
+spring:
+  application:
+    name: atguigu-crowd-pay
+  session:
+    store-type: redis
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:1000/eureka
+
+ribbon:
+  # 10秒 - 处理请求的超时时间，默认为5秒
+  ReadTimeout: 10000
+  # 10秒 - 连接建立的超时时长，默认5秒
+  ConnectTimeout: 10000
+
+feign:
+  hystrix:
+    # 使用 Hystrix 断路器
+    enabled: true
+
+ali:
+  pay:
+    alipay-public-key: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoauF73gbBsJVQkFK/gmmVOWzYevEJZyPozl9L/49MvZKgo9oVOniBIJZq3+/ve6UZUKxLhKGFekP7mCsqMP3J+dr/a12gcVeBX8mu8J6ArwJnQ+pNsbZl9/dlpaob7qEGPd4gCZyr4J31ejpHrFJZBrUeHMtp3bo41YlMa7EKq4eoI8o8nm8yLFedtmtE5/LlY1uj3W0n6ZTGMjGfAOBQSICeoEJZPH+9u/NkLC/2FhRNNMwEAyp0xYQ3AjlX93GFL5F/1nc56oXDzpcIVzBXW+RP8Of1ISwFiXw6qF/P+zXLUNFmjDh03bJrdHoYuvS/Xygs53gwLYFIF+Qdo1KBwIDAQAB
+    app-id: 2016100100642012
+    charset: utf-8
+    gateway-url: https://openapi.alipaydev.com/gateway.do
+    merchant-private-key: MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCSW8OKd+By+Ea7UP9yCbWtlhvr7QvgAfiG9joMwbZ+Zma2/YMOWaAPD6NowrnaNaNd9gWZB/qJ1oe5QAXUi4bi/J1n+1+T1giRSaFtpkfDeRBvKmTiSyYCeGk7aeT0FWODWQB7ZnPD9R6KCeJCVhzN2YmurNFHftiM1fFcRHUNb5Daw0m7xKrOebQwMIk7K3at5a/Yd5nMUcOqoUOKTXMjxXSW6CnFXMCirPhg/e5aAMD+GiOUOIKx/DTtnZjVBv5UF0MJ7Xg1/wtrkHi4k3ZPLwJdMjv4UOH9377BbGFkyc0/0PJPhG69TqyyOInUCDNDyhzaYpH423GhlJy4uywrAgMBAAECggEAenw/jp+6gJ1VnKgxz/9eQ3Lv1SdiG8uqcVCZzllD4E7UwWoyhwzszg35ZNAqd/sRyK3/i03JGBgpKBjziCho74gYN5CBMZkbPHQRnFFfl7C210H0ggoAOmsJLob17GwGB0OyCpP4aFO4hi+1Ymzs2D2pYz0QPDRlCKB3yQ8louKjlykGSWwo58zwm935BHvv//JijHGbMbqDJGMfj/ogjhDP0txE7ZBiO9sEc1RjZ5Csg/81H8XSXCGyMowTX+I2M2ys59HMiuZFLM3pG5/UfOkqGKEJcv/ymsKILgL5h2XvLIFbgUqG4WMmHAX+moApnqmnkOtvSnE1u9hnBIkE+QKBgQDuerisalgfDlJ4wn3A7yQyX4cbT3ozLmqo/FZrlrd/ZJ/HgFrGBiEjaSxWRUxVUBGOgyQszOCzvhPySJjW6Y+xcai1MpC0z9fnvbpFM5GVVKUDIIA//O8+Ukd7wZyW20jebeFNk9I/kTAHs751wSJ8x60OET34r+ESk6aV+9xMDQKBgQCdHHK2XKgbUb+LtM0BUDq4KzPWW3/XYMrKpazDjwB+z2XWJSzch4nXyEa/8QAnUI3Atyn0fK1BmfyvFFtHpQtUpMUKtsswz9+RLwFrFrMspl3POlQEaU32fzl/RL7mybZyt71Mqcgq41DAtrVcyXWhgU1x6XrHcCxwZ0LROsDzFwKBgEolLbWteqhtM4cIMUEDGSXwPXloRH4VOGRB0DyzJ2ocRvEoHxDiZvszf+1yrkD4G/1LGLw1FsfLmTgDCkIHa/2ncOSlTAhrdp0+h+NsHR9oqcVHHZjHczrVKhR4Jc9hbk55q0sLYpsQ8PX0FItX+PkCu/NbuQDQ7hFwhqKrI9shAoGADU9LqIdQ9n+Gap92fpX9Y3zFd3No8SYSB/jhGfATaqrHRc0Ab+5Ljyw4UipoiOwaFiluNHgbdWNGNM7UrM0emJ0c1DuIGyqBFhuVUy0pIK83Y0bdt0H0iN1eUZnRUlvkSPOn5ca8XmXDgY/47VNj07rQhMXy0NJ/8UXOM0t27SECgYEAxERMjSKIjJ4VRcVcroBzdXZ2O3Pj9r1BLkyY8qKmptYvA+yinVWvvVzwjoHqLoqEkVZMq2ixrLYt7sl3esfGyUIdxjXUI1cbvCOpbDe7f0kJxvXyldC5Lrtama5gdJE36JFGbWrf2PRg4in1sizMjyY8G/SDMS0MNKpzos4pASQ=
+    notify-url: http://175.178.174.83/pay/notify
+    return-url: http://175.178.174.83/pay/return
+    sign-type: RSA2
+```
+
+
+
+### 2.5 新建 `OrderVO`【`entity` 工程】
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662806372988-36a00d46-3771-4e0f-9e2c-63e009937995.png)
+
+```java
+package com.atguigu.crowd.entity.vo;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.io.Serializable;
+
+/**
+ * @author 陈江林
+ * @date 2022/9/10 16:14
+ */
+@NoArgsConstructor
+@AllArgsConstructor
+@Data
+public class OrderVO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    private Integer id;
+
+    /**
+     * 收货地址表主键
+     */
+    private String addressId;
+
+    /**
+     * 订单号
+     */
+    private String orderName;
+
+    /**
+     * 支付宝流水单号
+     */
+    private String payOrderNum;
+
+    /**
+     * 订单金额
+     */
+    private Double orderAmount;
+
+    /**
+     * 是否开发票 [{0: 不开发票}, {1: 开发票}]
+     */
+    private String invoice;
+
+    /**
+     * 发票抬头
+     */
+    private String invoiceTitle;
+
+    /**
+     * 订单备注
+     */
+    private String orderRemark;
+
+    private OrderProjectVO orderProjectVO;
+
+}
+```
+
+
+
+### 2.6 追加路由规则【`zuul`工程】
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662806357066-136c3a1b-33e6-4716-96ae-0bc091735ddf.png)
+
+```yaml
+zuul:
+  routes:
+    crowd-pay:
+      service-id: atguigu-crowd-pay
+      path: /pay/**
+```
+
+
+
+## 3. 操作二: 提交订单表单
+
+### 3.1 提交表单 <关键代码>
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662797951303-17c4a519-451b-446c-b60a-cf5cf50bfdc8.png)
+
+```javascript
+$("#payButton").click(function () {
+    // 1.收集所有要提交的表单项的数据
+    var addressId = $("[name=addressId]:checked").val();
+    var invoice = $("[name=invoiceRadio]:checked").val();
+    var invoiceTitle = $.trim($("[name=invoiceTitle]").val());
+    var remark = $.trim($("[name=remark]").val());
+
+    // 2.将上面收集到的表单数据填充到空表单中并提交
+    $("#summaryForm")
+        .append("<input type='hidden' name='addressId' value='" + addressId + "'/>")
+        .append("<input type='hidden' name='invoice' value='" + invoice + "'/>")
+        .append("<input type='hidden' name='invoiceTitle' value='" + invoiceTitle + "'/>")
+        .append("<input type='hidden' name='orderRemark' value='" + remark + "'/>")
+        .submit();
+});
+<!-- 为了收集当前页面中的所有数据，构造空表单 -->
+<form id="summaryForm" action="pay/generate/order" method="post"></form>
+```
+
+
+
+### 3.2 调用支付接口
+
+#### 3.2.1 新建 `PayHandler`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662806449103-5f18e8a5-c419-41b2-8a38-b8d2e8486ad3.png)
+
+```java
+package com.atguigu.crowd.handler;
+
+import com.alipay.api.AlipayApiException;
+import com.alipay.api.AlipayClient;
+import com.alipay.api.DefaultAlipayClient;
+import com.alipay.api.request.AlipayTradePagePayRequest;
+import com.atguigu.crowd.config.PayProperties;
+import com.atguigu.crowd.entity.vo.OrderProjectVO;
+import com.atguigu.crowd.entity.vo.OrderVO;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import javax.servlet.http.HttpSession;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.UUID;
+
+/**
+ * @author 陈江林
+ * @date 2022/9/10 16:23
+ */
+@Controller
+public class PayHandler {
+
+    @Autowired
+    private PayProperties payProperties;
+    
+    /**
+     * 生成订单, 调用支付宝支付
+     *
+     * @param session
+     * @param orderVO
+     * @return {@link String}
+     * @throws AlipayApiException
+     */
+    @ResponseBody
+    @RequestMapping("/generate/order")
+    public String generateOrder(HttpSession session, OrderVO orderVO) throws AlipayApiException {
+        // 1. 从 Session 域获取 OrderProjectVO 对象
+        OrderProjectVO orderProjectVO = (OrderProjectVO) session.getAttribute("orderProjectVO");
+
+        // 2. 将 orderProjectVO 对象和 orderVO 对象组装到一起
+        orderVO.setOrderProjectVO(orderProjectVO);
+
+        // 3. 生成订单号并设置到 orderVO 对象中
+        // 根据当前日期时间生成字符串
+        String time = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
+
+        // 使用 UUID 生成用户 ID 部分
+        String user = UUID.randomUUID().toString().replace("-", "").toUpperCase();
+
+        // 组装
+        String orderNum = time + user;
+
+        // 设置到 OrderVO 对象中
+        orderVO.setOrderName(orderNum);
+
+        // 4. 计算订单总金额设置到 orderVO 对象中
+        Double orderAmount = (double) (orderProjectVO.getSupportPrice() * orderProjectVO.getReturnCount() + orderProjectVO.getFreight());
+        orderVO.setOrderAmount(orderAmount);
+
+        // 将 OrderVO 对象存入 Session 域
+        session.setAttribute("orderVO", orderVO);
+
+        // 5. 调用支付请求
+        return sendRequestToAliPay(orderNum, orderAmount, orderProjectVO.getProjectName(), orderProjectVO.getReturnContent());
+    }
+
+    /**
+     * 阿里支付发送请求
+     *
+     * @param outTradeNo  商户订单号，商户网站订单系统中唯一订单号，必填
+     * @param totalAmount 付款金额，必填
+     * @param subject     订单名称，必填
+     * @param body        商品描述，可空
+     * @throws AlipayApiException 支付宝api例外
+     */
+    private String sendRequestToAliPay(
+            String outTradeNo,
+            Double totalAmount,
+            String subject,
+            String body
+    ) throws AlipayApiException {
+        //获得初始化的AlipayClient
+        AlipayClient alipayClient = new DefaultAlipayClient(payProperties.getGatewayUrl(), payProperties.getAppId(), payProperties.getMerchantPrivateKey(), "json", payProperties.getCharset(), payProperties.getAlipayPublicKey(), payProperties.getSignType());
+
+        //设置请求参数
+        AlipayTradePagePayRequest alipayRequest = new AlipayTradePagePayRequest();
+        alipayRequest.setReturnUrl(payProperties.getReturnUrl());
+        alipayRequest.setNotifyUrl(payProperties.getNotifyUrl());
+
+        alipayRequest.setBizContent("{\"out_trade_no\":\"" + outTradeNo + "\","
+                + "\"total_amount\":\"" + totalAmount + "\","
+                + "\"subject\":\"" + subject + "\","
+                + "\"body\":\"" + body + "\","
+                + "\"product_code\":\"FAST_INSTANT_TRADE_PAY\"}");
+
+        //若想给BizContent增加其他可选请求参数，以增加自定义超时时间参数timeout_express来举例说明
+        //alipayRequest.setBizContent("{\"out_trade_no\":\""+ out_trade_no +"\","
+        //		+ "\"total_amount\":\""+ total_amount +"\","
+        //		+ "\"subject\":\""+ subject +"\","
+        //		+ "\"body\":\""+ body +"\","
+        //		+ "\"timeout_express\":\"10m\","
+        //		+ "\"product_code\":\"FAST_INSTANT_TRADE_PAY\"}");
+        //请求参数可查阅【电脑网站支付的API文档-alipay.trade.page.pay-请求参数】章节
+
+        //请求
+        return alipayClient.pageExecute(alipayRequest).getBody();
+    }
+
+}
+```
+
+
+
+#### 3.2.2 `out_trade_no`（商户订单号）参数说明
+
+| **描述** | **说明**                                                     |
+| -------- | ------------------------------------------------------------ |
+| 参数说明 | 商家订单号。商户自定义生成，一个 `out_trade_no` 对应一个 `trade_no`（支付宝交易号）。 |
+| 命名要求 | 64个字符以内。可以包含字母、数字、下划线。需保证在商户端不重复。 |
+| 注意事项 | 该参数为商户对接支付宝支付接口定义传值的参数，需保证该参数不重复，所以不能使用同一个订单号去请求接口。 |
+
+- 格式设计: `当前时间（年月日小时分秒）+ 用户ID`
+
+- - 时间格式: `yyyyMMddHHmmss`（14位）
+- 用户ID: 通过 `UUID` 生成（32位）
+
+
+
+## 4. 操作三: `returnUrl`方法
+
+### 4.1 追加代码
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662806708454-27edc086-d60f-46f1-aa38-d31a58b3e282.png)
+
+```java
+    @ResponseBody
+    @RequestMapping("/return")
+    public String returnUrlMethod(HttpServletRequest request, HttpSession session) throws
+            UnsupportedEncodingException, AlipayApiException {
+        //获取支付宝GET过来反馈信息
+        Map<String, String> params = new HashMap<>();
+        Map<String, String[]> requestParams = request.getParameterMap();
+        for (Iterator<String> iter = requestParams.keySet().iterator(); iter.hasNext(); ) {
+            String name = iter.next();
+            String[] values = requestParams.get(name);
+            String valueStr = "";
+            for (int i = 0; i < values.length; i++) {
+                valueStr = (i == values.length - 1) ? valueStr + values[i]
+                        : valueStr + values[i] + ",";
+            }
+
+            //乱码解决，这段代码在出现乱码时使用
+            valueStr = new String(valueStr.getBytes("ISO-8859-1"), "utf-8");
+            params.put(name, valueStr);
+        }
+
+        //调用SDK验证签名
+        boolean signVerified = AlipaySignature.rsaCheckV1(
+                params,
+                payProperties.getAlipayPublicKey(),
+                payProperties.getCharset(),
+                payProperties.getSignType());
+
+        //——请在这里编写您的程序（以下代码仅作参考）——
+        if (signVerified) {
+            //商户订单号
+            String orderName = new String(request.getParameter("out_trade_no").getBytes("ISO-8859-1"), "UTF-8");
+            //支付宝交易号
+            String payOrderNum = new String(request.getParameter("trade_no").getBytes("ISO-8859-1"), "UTF-8");
+            //付款金额
+            String orderAmount = new String(request.getParameter("total_amount").getBytes("ISO-8859-1"), "UTF-8");
+
+            // 保存到数据库
+            // ......
+            return "trade_no:" + orderName + "<br/>out_trade_no:" + payOrderNum + "<br/>total_amount:" + orderAmount;
+        } else {
+            // 页面显示信息: 验签失败
+            return "验签失败";
+        }
+
+    }
+```
+
+
+
+## 5. 操作四: `notifyUrl`方法
+
+### 5.1 追加代码
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662806708454-27edc086-d60f-46f1-aa38-d31a58b3e282.png)
+
+```java
+    @RequestMapping("/notify")
+    public void notifyUrlMethod(HttpServletRequest request) throws UnsupportedEncodingException, AlipayApiException {
+        //获取支付宝POST过来反馈信息
+        Map<String, String> params = new HashMap<>();
+        Map<String, String[]> requestParams = request.getParameterMap();
+        for (Iterator<String> iter = requestParams.keySet().iterator(); iter.hasNext(); ) {
+            String name = iter.next();
+            String[] values = requestParams.get(name);
+            String valueStr = "";
+            for (int i = 0; i < values.length; i++) {
+                valueStr = (i == values.length - 1) ? valueStr + values[i]
+                        : valueStr + values[i] + ",";
+            }
+
+            //乱码解决，这段代码在出现乱码时使用
+            valueStr = new String(valueStr.getBytes("ISO-8859-1"), "utf-8");
+            params.put(name, valueStr);
+        }
+
+        //调用SDK验证签名
+        boolean signVerified = AlipaySignature.rsaCheckV1(
+                params,
+                payProperties.getAlipayPublicKey(),
+                payProperties.getCharset(),
+                payProperties.getSignType());
+        //——请在这里编写您的程序（以下代码仅作参考）——
+
+	    /* 实际验证过程建议商户务必添加以下校验：
+	    1、需要验证该通知数据中的out_trade_no是否为商户系统中创建的订单号，
+	    2、判断total_amount是否确实为该订单的实际金额（即商户订单创建时的金额），
+	    3、校验通知中的seller_id（或者seller_email) 是否为out_trade_no这笔单据的对应的操作方（有的时候，一个商户可能有多个seller_id/seller_email）
+	    4、验证app_id是否为该商户本身。
+	    */
+        // 验证成功
+        if (signVerified) {
+            // 商户订单号
+            String out_trade_no = new String(request.getParameter("out_trade_no").getBytes("ISO-8859-1"), "UTF-8");
+
+            // 支付宝交易号
+            String trade_no = new String(request.getParameter("trade_no").getBytes("ISO-8859-1"), "UTF-8");
+
+            // 交易状态
+            String trade_status = new String(request.getParameter("trade_status").getBytes("ISO-8859-1"), "UTF-8");
+
+            logger.info("商户订单号 out_trade_no=" + out_trade_no);
+            logger.info("支付宝交易号 trade_no=" + trade_no);
+            logger.info("交易状态 trade_status=" + trade_status);
+
+            // return "success";
+        } else {//验证失败
+            logger.info("验证失败");
+            // return "fail";
+
+            //调试用，写文本函数记录程序运行情况是否正常
+            //String sWord = AlipaySignature.getSignCheckContentV1(params);
+            //AlipayConfig.logResult(sWord);
+        }
+    }
+```
+
+
+
+### 5.2 触发通知类型
+
+| 通知类型                     | 描述     | 默认开启 |
+| ---------------------------- | -------- | -------- |
+| `tradeStatus.TRADE_CLOSED`   | 交易关闭 | 0        |
+| `tradeStatus.TRADE_FINISHED` | 交易完结 | 0        |
+| `tradeStatus.TRADE_SUCCESS`  | 支付成功 | 1        |
+| `tradeStatus.WAIT_BUYER_PAY` | 交易创建 | 0        |
+
+## 6. 操作五: 订单信息保存到数据库
+
+### 6.1 思路
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662831284650-59da73a5-ae2f-4389-98a6-12f0ec8f02eb.png)
+
+
+
+### 6.2 `return` 方法
+
+```java
+    @ResponseBody
+    @RequestMapping("/return")
+    public String returnUrlMethod(HttpServletRequest request, HttpSession session) throws
+            UnsupportedEncodingException, AlipayApiException {
+        // 获取支付宝GET过来反馈信息
+        Map<String, String> params = new HashMap<>();
+        Map<String, String[]> requestParams = request.getParameterMap();
+        for (Iterator<String> iter = requestParams.keySet().iterator(); iter.hasNext(); ) {
+            String name = iter.next();
+            String[] values = requestParams.get(name);
+            String valueStr = "";
+            for (int i = 0; i < values.length; i++) {
+                valueStr = (i == values.length - 1) ? valueStr + values[i]
+                        : valueStr + values[i] + ",";
+            }
+
+            // 乱码解决，这段代码在出现乱码时使用
+            valueStr = new String(valueStr.getBytes("ISO-8859-1"), "utf-8");
+            params.put(name, valueStr);
+        }
+
+        // 调用SDK验证签名
+        boolean signVerified = AlipaySignature.rsaCheckV1(
+                params,
+                payProperties.getAlipayPublicKey(),
+                payProperties.getCharset(),
+                payProperties.getSignType());
+
+        // ——请在这里编写您的程序（以下代码仅作参考）——
+        if (signVerified) {
+            // 商户订单号
+            String orderName = new String(request.getParameter("out_trade_no").getBytes("ISO-8859-1"), "UTF-8");
+            // 支付宝交易号
+            String payOrderNum = new String(request.getParameter("trade_no").getBytes("ISO-8859-1"), "UTF-8");
+            // 付款金额
+            String orderAmount = new String(request.getParameter("total_amount").getBytes("ISO-8859-1"), "UTF-8");
+
+            // 保存到数据库
+            OrderVO orderVO = (OrderVO)session.getAttribute("orderVO");
+            // 将支付宝及交易号设置到 OrderVO 中
+            orderVO.setPayOrderNum(payOrderNum);
+
+            // 发起请求
+            ResultEntity<String> resultEntity = mySQLRemoteService.saveOrderRemote(orderVO);
+            logger.info("Order save result" + resultEntity.getResult());
+
+            return "trade_no:" + orderName + "<br/>out_trade_no:" + payOrderNum + "<br/>total_amount:" + orderAmount;
+        } else {
+            // 页面显示信息: 验签失败
+            return "验签失败";
+        }
+
+    }
+```
+
+
+
+### 6.3 声明接口
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662831655752-72f5cb75-0f32-4147-b998-eca4204a2995.png)
+
+```java
+    /**
+     * 保存订单
+     *
+     * @param orderVO
+     * @return {@link ResultEntity}<{@link String}>
+     */
+    @RequestMapping("/save/order/remote")
+    ResultEntity<String> saveOrderRemote(@RequestBody OrderVO orderVO);
+```
+
+
+
+#### 6.3.1 对应的降级机制
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1662831684904-0a10fe56-ad87-4381-a721-7592ec648c7b.png)
+
+```java
+@Override
+public ResultEntity<String> saveOrderRemote(OrderVO orderVO) {
+    return ResultEntity.failed("降级机制生效: " + cause.getMessage());
+}
+```
+
+
+
+### 6.4 追加代码【`mysql` 工程】
+
+- `OrderProviderHandler`
+
+```java
+    @HystrixCommand(fallbackMethod = "saveOrderRemoteBackup")
+    @RequestMapping("/save/order/remote")
+    public ResultEntity<String> saveOrderRemote(@RequestBody OrderVO orderVO) {
+        try {
+            orderService.saveOrder(orderVO);
+            return ResultEntity.successWithoutData();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResultEntity.failed(e.getMessage());
+        }
+    }
+
+    public ResultEntity<String> saveOrderRemoteBackup(@RequestBody OrderVO orderVO) {
+        return ResultEntity.failed(CrowdConstant.MESSAGE_HYSTRIX_BACKUP);
+    }
+```
+
+- `OrderService`
+
+```java
+    /**
+     * 保存订单
+     *
+     * @param orderVO
+     */
+    void saveOrder(OrderVO orderVO);
+```
+
+- `OrderServiceImpl`
+
+```java
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    @Override
+    public void saveOrder(OrderVO orderVO) {
+        OrderPO orderPO = new OrderPO();
+        BeanUtils.copyProperties(orderVO, orderPO);
+
+        OrderProjectPO orderProjectPO = new OrderProjectPO();
+        BeanUtils.copyProperties(orderVO.getOrderProjectVO(), orderProjectPO);
+
+        // 保存 orderPO 自动生成的主键是 orderProjectPO 需要的
+        orderPOMapper.insert(orderPO);
+        Integer id = orderPO.getId();
+        orderProjectPO.setOrderId(id + "");
+
+        orderProjectPOMapper.insert(orderProjectPO);
+    }
+```
+
+- `OrderPOMapper.xml`
+
+```xml
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id" parameterType="com.atguigu.crowd.entity.po.OrderPO" >
+    insert into t_order (id, address_id, order_name, 
+      pay_order_num, order_amount, invoice, 
+      invoice_title, order_remark)
+    values (#{id,jdbcType=INTEGER}, #{addressId,jdbcType=VARCHAR}, #{orderName,jdbcType=VARCHAR}, 
+      #{payOrderNum,jdbcType=VARCHAR}, #{orderAmount,jdbcType=DOUBLE}, #{invoice,jdbcType=VARCHAR}, 
+      #{invoiceTitle,jdbcType=VARCHAR}, #{orderRemark,jdbcType=VARCHAR})
+  </insert>
 ```

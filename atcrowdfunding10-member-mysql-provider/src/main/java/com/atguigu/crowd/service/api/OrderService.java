@@ -3,6 +3,7 @@ package com.atguigu.crowd.service.api;
 import com.atguigu.crowd.entity.po.AddressPO;
 import com.atguigu.crowd.entity.vo.AddressVO;
 import com.atguigu.crowd.entity.vo.OrderProjectVO;
+import com.atguigu.crowd.entity.vo.OrderVO;
 import com.atguigu.crowd.util.ResultEntity;
 
 import java.util.List;
@@ -36,4 +37,10 @@ public interface OrderService {
      */
     void saveAddressPO(AddressPO addressPO);
 
+    /**
+     * 保存订单
+     *
+     * @param orderVO
+     */
+    void saveOrder(OrderVO orderVO);
 }
