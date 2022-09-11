@@ -1,3 +1,8 @@
+DROP DATABASE IF EXISTS project_crowd;
+
+CREATE DATABASE project_crowd;
+USE project_crowd;
+
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
@@ -41,6 +46,26 @@ BEGIN;
 INSERT INTO `inner_role_auth` (`id`, `role_id`, `auth_id`) VALUES (1, 3, 4);
 INSERT INTO `inner_role_auth` (`id`, `role_id`, `auth_id`) VALUES (2, 4, 6);
 INSERT INTO `inner_role_auth` (`id`, `role_id`, `auth_id`) VALUES (3, 4, 3);
+COMMIT;
+
+-- ----------------------------
+-- Table structure for t_address
+-- ----------------------------
+DROP TABLE IF EXISTS `t_address`;
+CREATE TABLE `t_address` (
+                             `id` int(11) NOT NULL AUTO_INCREMENT,
+                             `receive_name` varchar(255) DEFAULT NULL COMMENT '收件人',
+                             `phone_num` varchar(255) DEFAULT NULL COMMENT '手机号',
+                             `address` varchar(255) DEFAULT NULL COMMENT '地址',
+                             `member_id` varchar(255) DEFAULT NULL COMMENT '会员表主键',
+                             PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8 COMMENT='收货地址表';
+
+-- ----------------------------
+-- Records of t_address
+-- ----------------------------
+BEGIN;
+INSERT INTO `t_address` (`id`, `receive_name`, `phone_num`, `address`, `member_id`) VALUES (1, '收货人', '18512341234', '收货地址', '1');
 COMMIT;
 
 -- ----------------------------
@@ -150,34 +175,6 @@ INSERT INTO `t_member_confirm_info` (`id`, `memberid`, `paynum`, `cardnum`) VALU
 COMMIT;
 
 -- ----------------------------
--- Table structure for t_member_copy1
--- ----------------------------
-DROP TABLE IF EXISTS `t_member_copy1`;
-CREATE TABLE `t_member_copy1` (
-                                  `id` int(11) NOT NULL AUTO_INCREMENT,
-                                  `loginacct` varchar(255) NOT NULL,
-                                  `userpswd` varchar(255) NOT NULL,
-                                  `username` varchar(255) DEFAULT NULL,
-                                  `email` varchar(255) DEFAULT NULL,
-                                  `authstatus` int(4) DEFAULT NULL COMMENT '实名认证状态 [{0: 未实名认证}, {1: 实名认证申请中}, {2: 已实名认证}]',
-                                  `usertype` int(4) DEFAULT NULL COMMENT '[{0: 个人}, {1: 企业}]',
-                                  `realname` varchar(255) DEFAULT NULL COMMENT '真实姓名',
-                                  `cardnum` varchar(255) DEFAULT NULL COMMENT '卡号',
-                                  `accttype` int(4) DEFAULT NULL COMMENT '[{0: 企业}, {1: 个体}, {2: 个人}, {3: 政府}]',
-                                  PRIMARY KEY (`id`),
-                                  UNIQUE KEY `t_member_pk` (`loginacct`)
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8;
-
--- ----------------------------
--- Records of t_member_copy1
--- ----------------------------
-BEGIN;
-INSERT INTO `t_member_copy1` (`id`, `loginacct`, `userpswd`, `username`, `email`, `authstatus`, `usertype`, `realname`, `cardnum`, `accttype`) VALUES (1, 'jack', '$2a$10$L/7qsHMpVsCRePdhzF7mbuGw2VBCbPd4oOR7I3W6TF04DFHUyb3Qe', '杰克', 'jack@qq.com', 1, 1, '杰克', '430626220104045821', 2);
-INSERT INTO `t_member_copy1` (`id`, `loginacct`, `userpswd`, `username`, `email`, `authstatus`, `usertype`, `realname`, `cardnum`, `accttype`) VALUES (5, 'tom', '123', NULL, NULL, NULL, NULL, NULL, NULL, NULL);
-INSERT INTO `t_member_copy1` (`id`, `loginacct`, `userpswd`, `username`, `email`, `authstatus`, `usertype`, `realname`, `cardnum`, `accttype`) VALUES (6, 'qq', '$2a$10$qX4Dk3KHBnLo.AnkY4ngaeFkn0FBJcX3a3IWmFIjdFsv1rTifePD6', 'user', '123456@qq.com', NULL, NULL, NULL, NULL, NULL);
-COMMIT;
-
--- ----------------------------
 -- Table structure for t_member_launch_info
 -- ----------------------------
 DROP TABLE IF EXISTS `t_member_launch_info`;
@@ -243,6 +240,50 @@ INSERT INTO `t_menu` (`id`, `pid`, `name`, `url`, `icon`) VALUES (20, 1, 'A', 'A
 COMMIT;
 
 -- ----------------------------
+-- Table structure for t_order
+-- ----------------------------
+DROP TABLE IF EXISTS `t_order`;
+CREATE TABLE `t_order` (
+                           `id` int(11) NOT NULL AUTO_INCREMENT,
+                           `address_id` varchar(255) DEFAULT NULL COMMENT '收货地址表主键',
+                           `order_name` varchar(255) DEFAULT NULL COMMENT '订单号',
+                           `pay_order_num` varchar(255) DEFAULT NULL COMMENT '支付宝流水单号',
+                           `order_amount` double(10,5) DEFAULT NULL COMMENT '订单金额',
+                           `invoice` varchar(255) DEFAULT NULL COMMENT '是否开发票 [{0: 不开发票}, {1: 开发票}]',
+                           `invoice_title` varchar(255) DEFAULT NULL COMMENT '发票抬头',
+                           `order_remark` varchar(255) DEFAULT NULL COMMENT '订单备注',
+                           PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='订单表';
+
+-- ----------------------------
+-- Records of t_order
+-- ----------------------------
+BEGIN;
+COMMIT;
+
+-- ----------------------------
+-- Table structure for t_order_project
+-- ----------------------------
+DROP TABLE IF EXISTS `t_order_project`;
+CREATE TABLE `t_order_project` (
+                                   `id` int(11) NOT NULL AUTO_INCREMENT,
+                                   `project_name` varchar(255) DEFAULT NULL COMMENT '项目名称',
+                                   `launch_name` varchar(255) DEFAULT NULL COMMENT '发起人',
+                                   `return_content` varchar(255) DEFAULT NULL COMMENT '回报内容',
+                                   `return_count` int(11) DEFAULT NULL COMMENT '回报数量',
+                                   `support_price` int(11) DEFAULT NULL COMMENT '支持单价',
+                                   `freight` int(11) DEFAULT NULL COMMENT '配送费用',
+                                   `order_id` varchar(255) DEFAULT NULL COMMENT '订单表主键',
+                                   PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='项目信息表';
+
+-- ----------------------------
+-- Records of t_order_project
+-- ----------------------------
+BEGIN;
+COMMIT;
+
+-- ----------------------------
 -- Table structure for t_project
 -- ----------------------------
 DROP TABLE IF EXISTS `t_project`;
@@ -262,18 +303,12 @@ CREATE TABLE `t_project` (
                              `follower` int(11) DEFAULT NULL COMMENT '关注人数',
                              `header_picture_path` varchar(255) DEFAULT NULL COMMENT '头图路径',
                              PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8 COMMENT='项目表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='项目表';
 
 -- ----------------------------
 -- Records of t_project
 -- ----------------------------
 BEGIN;
-INSERT INTO `t_project` (`id`, `project_name`, `project_description`, `money`, `day`, `status`, `deploydate`, `supportmoney`, `supporter`, `completion`, `memberid`, `createdate`, `follower`, `header_picture_path`) VALUES (15, 'brotherMao', '就是帅！', 100, 30, 0, '2022-09-04', 11, 1, 11, 1, '2022-09-03', 11, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/4fcaa821-f0b7-46f8-aebc-825bb1e208b2.jpg');
-INSERT INTO `t_project` (`id`, `project_name`, `project_description`, `money`, `day`, `status`, `deploydate`, `supportmoney`, `supporter`, `completion`, `memberid`, `createdate`, `follower`, `header_picture_path`) VALUES (16, 'brotherMao', '就是帅！', 100, 30, 0, '2022-09-04', 11, 2, 11, 1, '2022-09-03', 12, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/4fcaa821-f0b7-46f8-aebc-825bb1e208b2.jpg');
-INSERT INTO `t_project` (`id`, `project_name`, `project_description`, `money`, `day`, `status`, `deploydate`, `supportmoney`, `supporter`, `completion`, `memberid`, `createdate`, `follower`, `header_picture_path`) VALUES (17, 'brotherMao', '就是帅！', 100, 30, 0, '2022-09-04', 11, 3, 11, 1, '2022-09-03', 13, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/4fcaa821-f0b7-46f8-aebc-825bb1e208b2.jpg');
-INSERT INTO `t_project` (`id`, `project_name`, `project_description`, `money`, `day`, `status`, `deploydate`, `supportmoney`, `supporter`, `completion`, `memberid`, `createdate`, `follower`, `header_picture_path`) VALUES (18, 'brotherMao', '就是帅！', 100, 30, 0, '2022-09-04', 11, 4, 11, 1, '2022-09-03', 14, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/4fcaa821-f0b7-46f8-aebc-825bb1e208b2.jpg');
-INSERT INTO `t_project` (`id`, `project_name`, `project_description`, `money`, `day`, `status`, `deploydate`, `supportmoney`, `supporter`, `completion`, `memberid`, `createdate`, `follower`, `header_picture_path`) VALUES (19, 'brotherMao', '就是帅！', 100, 30, 0, '2022-09-01', 11, 5, 11, 1, '2022-09-03', 15, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/4fcaa821-f0b7-46f8-aebc-825bb1e208b2.jpg');
-INSERT INTO `t_project` (`id`, `project_name`, `project_description`, `money`, `day`, `status`, `deploydate`, `supportmoney`, `supporter`, `completion`, `memberid`, `createdate`, `follower`, `header_picture_path`) VALUES (20, 'brotherMao', '就是帅！', 100, 30, 0, '2022-09-04', 11, 6, 11, 1, '2022-09-04', 16, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/4fcaa821-f0b7-46f8-aebc-825bb1e208b2.jpg');
 COMMIT;
 
 -- ----------------------------
@@ -285,18 +320,12 @@ CREATE TABLE `t_project_item_pic` (
                                       `projectid` int(11) DEFAULT NULL COMMENT 't_project 标识',
                                       `item_pic_path` varchar(255) DEFAULT NULL COMMENT '图片名称',
                                       PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8 COMMENT='项目表项目详情图片表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='项目表项目详情图片表';
 
 -- ----------------------------
 -- Records of t_project_item_pic
 -- ----------------------------
 BEGIN;
-INSERT INTO `t_project_item_pic` (`id`, `projectid`, `item_pic_path`) VALUES (9, 15, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/deb8461d-cdb4-4652-9aed-096a63671bdb.jpg');
-INSERT INTO `t_project_item_pic` (`id`, `projectid`, `item_pic_path`) VALUES (10, 16, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/deb8461d-cdb4-4652-9aed-096a63671bdb.jpg');
-INSERT INTO `t_project_item_pic` (`id`, `projectid`, `item_pic_path`) VALUES (11, 17, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/deb8461d-cdb4-4652-9aed-096a63671bdb.jpg');
-INSERT INTO `t_project_item_pic` (`id`, `projectid`, `item_pic_path`) VALUES (12, 18, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/deb8461d-cdb4-4652-9aed-096a63671bdb.jpg');
-INSERT INTO `t_project_item_pic` (`id`, `projectid`, `item_pic_path`) VALUES (13, 19, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/deb8461d-cdb4-4652-9aed-096a63671bdb.jpg');
-INSERT INTO `t_project_item_pic` (`id`, `projectid`, `item_pic_path`) VALUES (14, 20, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/deb8461d-cdb4-4652-9aed-096a63671bdb.jpg');
 COMMIT;
 
 -- ----------------------------
@@ -308,31 +337,12 @@ CREATE TABLE `t_project_tag` (
                                  `projectid` int(11) DEFAULT NULL COMMENT 't_project 标识',
                                  `tagid` int(11) DEFAULT NULL COMMENT 't_tag 标识',
                                  PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=38 DEFAULT CHARSET=utf8 COMMENT='项目标签中间表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='项目标签中间表';
 
 -- ----------------------------
 -- Records of t_project_tag
 -- ----------------------------
 BEGIN;
-INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (19, 15, 4);
-INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (20, 15, 7);
-INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (21, 16, 9);
-INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (22, 16, 7);
-INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (23, 17, 4);
-INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (24, 17, 7);
-INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (25, 17, 9);
-INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (26, 18, 7);
-INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (27, 18, 9);
-INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (28, 18, 7);
-INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (29, 18, 9);
-INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (30, 18, 7);
-INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (31, 18, 9);
-INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (32, 19, 4);
-INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (33, 19, 7);
-INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (34, 19, 9);
-INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (35, 20, 6);
-INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (36, 20, 8);
-INSERT INTO `t_project_tag` (`id`, `projectid`, `tagid`) VALUES (37, 20, 10);
 COMMIT;
 
 -- ----------------------------
@@ -344,22 +354,12 @@ CREATE TABLE `t_project_type` (
                                   `projectid` int(11) DEFAULT NULL COMMENT 't_project 标识',
                                   `typeid` int(11) DEFAULT NULL COMMENT 't_type 标识',
                                   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=39 DEFAULT CHARSET=utf8 COMMENT='项目和分类中间表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='项目和分类中间表';
 
 -- ----------------------------
 -- Records of t_project_type
 -- ----------------------------
 BEGIN;
-INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (29, 15, 2);
-INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (30, 15, 4);
-INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (31, 16, 2);
-INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (32, 16, 4);
-INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (33, 17, 2);
-INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (34, 17, 4);
-INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (35, 18, 2);
-INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (36, 18, 4);
-INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (37, 19, 1);
-INSERT INTO `t_project_type` (`id`, `projectid`, `typeid`) VALUES (38, 20, 3);
 COMMIT;
 
 -- ----------------------------
@@ -380,18 +380,12 @@ CREATE TABLE `t_return` (
                             `returndate` int(11) DEFAULT NULL COMMENT '项目结束后多少天向支持者发送回报',
                             `describ_pic_path` varchar(255) DEFAULT NULL COMMENT '说明图片路径',
                             PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8 COMMENT='回报信息表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='回报信息表';
 
 -- ----------------------------
 -- Records of t_return
 -- ----------------------------
 BEGIN;
-INSERT INTO `t_return` (`id`, `projectid`, `type`, `supportmoney`, `content`, `count`, `signalpurchase`, `purchase`, `freight`, `invoice`, `returndate`, `describ_pic_path`) VALUES (1, 15, 1, 10, '以身相许', 5, 1, 8, 0, 1, 15, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/56c4d3ca-cb1f-4cfb-9bff-64fec98e131b.jpg');
-INSERT INTO `t_return` (`id`, `projectid`, `type`, `supportmoney`, `content`, `count`, `signalpurchase`, `purchase`, `freight`, `invoice`, `returndate`, `describ_pic_path`) VALUES (2, 16, 1, 10, '以身相许', 5, 1, 8, 0, 1, 15, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/56c4d3ca-cb1f-4cfb-9bff-64fec98e131b.jpg');
-INSERT INTO `t_return` (`id`, `projectid`, `type`, `supportmoney`, `content`, `count`, `signalpurchase`, `purchase`, `freight`, `invoice`, `returndate`, `describ_pic_path`) VALUES (3, 17, 0, 10, '以身相许', 5, 1, 8, 0, 1, 15, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/56c4d3ca-cb1f-4cfb-9bff-64fec98e131b.jpg');
-INSERT INTO `t_return` (`id`, `projectid`, `type`, `supportmoney`, `content`, `count`, `signalpurchase`, `purchase`, `freight`, `invoice`, `returndate`, `describ_pic_path`) VALUES (4, 18, 0, 10, '以身相许', 5, 1, 8, 0, 1, 15, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/56c4d3ca-cb1f-4cfb-9bff-64fec98e131b.jpg');
-INSERT INTO `t_return` (`id`, `projectid`, `type`, `supportmoney`, `content`, `count`, `signalpurchase`, `purchase`, `freight`, `invoice`, `returndate`, `describ_pic_path`) VALUES (5, 19, 0, 10, '以身相许', 5, 1, 8, 0, 1, 15, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/56c4d3ca-cb1f-4cfb-9bff-64fec98e131b.jpg');
-INSERT INTO `t_return` (`id`, `projectid`, `type`, `supportmoney`, `content`, `count`, `signalpurchase`, `purchase`, `freight`, `invoice`, `returndate`, `describ_pic_path`) VALUES (6, 20, 1, 10, '以身相许', 5, 1, 8, 0, 1, 15, 'https://atguigu220827.oss-cn-guangzhou.aliyuncs.com/20220904/56c4d3ca-cb1f-4cfb-9bff-64fec98e131b.jpg');
 COMMIT;
 
 -- ----------------------------
