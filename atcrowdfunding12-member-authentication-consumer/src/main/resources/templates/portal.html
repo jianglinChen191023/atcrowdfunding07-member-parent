@@ -234,7 +234,7 @@
                         <li><a th:href="@{/auth/member/to/login/page}">登录</a></li>
                         <li><a th:href="@{/auth/member/to/reg/page}">注册</a></li>
                         <li><a>|</a></li>
-                        <li><a href="admin-login.html">管理员入口</a></li>
+                        <li><a href="admin-login.html" th:href="@{${session.zuulPath}+':8080/atcrowdfunding02-admin-webui-1.0-SNAPSHOT/admin/to/login/page.html'}">管理员入口</a></li>
                     </ul>
                 </div>
             </div>
